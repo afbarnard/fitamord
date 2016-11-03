@@ -48,6 +48,10 @@ Design
 * engine
   * read data with csv module
   * implement data storage and manipulation in terms of Sqlite
+    * per http://sqlite.org/whentouse.html multiple concurrent reads
+      should be performant (try out to see how this works from Python)
+    * also: PRAGMA cache_size=-kibibytes; memory per database file
+    * also: PRAGMA threads=n; extra worker threads per query
   * assemble collections of facts using merge_collect
 
 * desiderata
