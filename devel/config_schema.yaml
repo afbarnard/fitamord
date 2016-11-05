@@ -1,0 +1,166 @@
+# Description of the YAML configuration file format (in terms of
+# annotated YAML)
+#
+# Copyright (c) 2016 Aubrey Barnard.  This is free software released
+# under the MIT License.  See `LICENSE.txt` for details.
+
+%YAML 1.2
+---
+
+# In general, any missing sections or fields will be treated as their
+# default values or just be considered unspecified if a particular value
+# is not necessary.  An empty configuration or no configuration at all
+# are both valid.
+
+# All values here can also be specified on the command line using dotted
+# names for nesting.  For example, changing the delimiter of the default
+# file format could be done with `--formats.csv.delimiter='|'`.
+
+# Indeed, configuration files and command line options are assembled
+# into a unified configuration environment.  Each command line option is
+# processed in order with subsequent options overriding earlier options
+# or appending to the list of values for the option.
+
+# Command line arguments are interpreted after command line options.
+# The first argument is the mode of operation.  Additional arguments
+# correspond to data files whose formats will be detected and who will
+# each be loaded into a table with the same base name.
+
+# Special file names: stdout, stderr, stdin, -.
+
+
+# Global Options
+# --------------
+
+# Global options with their default values.  These are equivalent to
+# command line options.
+
+# List of configuration files.  Following the tradition of Unix
+# utilities, they are only processed if they exist.  Intended for
+# repeated `--config=` options.
+config:
+  - fitamord.yaml
+
+# Log file
+log: stderr
+
+# Log level, one of {none, critical, error, warning, info, debug}
+log-level: info
+
+# Display help and exit.  Equivalent to `--mode=help`.
+help: no
+
+# Display version and exit.  Equivalent to `--mode=version`.
+version: no
+
+# Dump assembled configuration.  Equivalent to `--mode=dump-config`.
+dump-config: no
+
+# Pattern when searching for data files in the current directory
+data-pattern: *.csv
+
+# Delimiter to use for all files.  Can be overridden by individual
+# files.  Setting this prevents file format auto-detection and sets
+# formats.csv.delimiter.
+delimiter: null
+
+# Features file
+features: fitamord_features.csv
+
+# Sqlite DB file
+sqlitedb: fitamord_db.sqlite
+
+# Which of the tables contains the labels and study design
+labels: labels
+
+# List of Python extension files
+extension: null
+
+# How to handle bad records, one of {collect, log, error,
+# handler=<function-name>}.  Logging is done at the warning level.  When
+# collecting, bad records are written into the file
+# <input-file-basename>_badrecords.<extension> in the same format as the
+# input file.  The bad records are accompanied with comments explaining
+# the problem and their provenance.  Such a file can be edited and
+# reloaded.  A handler function must take 2 arguments: the record and an
+# exception that explains its rejection.
+bad-records: collect
+
+# TODO 'in' and 'out' sections for input and output files?  (Separate input and output files might be needed to derive similar files.)
+
+# Arguments
+
+# Mode of operation.  The first arguments is the mode (command) a la svn
+# or git.
+mode: gen-data
+
+# List of data files.  The second through last arguments are treated as
+# data files, as if each was prepended with `--data=`.
+data: null
+
+
+# File Formats
+# ------------
+
+# List of file formats.  These can be referenced by name when specifying
+# the formats of individual files.  The default list of formats is just
+# empty; no particular formats are specified.  The formats below are the
+# built-in formats.  They are available even if no other formats are
+# specified.
+formats:
+
+  # Built-in programming-style CSV format
+  csv:
+    delimiter: ',' # Any character
+    quoting-style: as_needed # none, always, as_needed
+    quote-char: '"' # Any character
+    escape-style: char # char, doubling
+    escape-char: '\\' # Any character
+
+  # Special non-format to control automatically detecting the file
+  # format
+  detect: yes
+
+  # Special built-in format for Prolog data files
+  prolog:
+
+
+# Files
+# -----
+
+# List of files.  If no files are specified, all data files in the
+# current directory are assumed to be included.  Data files are
+# identified by extension.
+files: # TODO
+
+  demos:
+    name: demographics.csv.xz # URI
+    format: xz(psv) # nestings: gz(tar(xz(psv)))
+    columns:
+      # Explicitly specifying types, non-conformant values will error
+      pt_id: int
+      birth_year: int
+      gender: str
+      age_at_death: nullable(float) # missing values ok
+
+
+# Tables
+# ------
+
+# List of tables.  There are no default tables.
+tables: # TODO
+
+
+# Engine
+# ------
+
+# Options for controlling the data processing engine
+engine:
+
+  # Number of threads to use
+  threads: auto
+
+  # Maximum amount of memory to use
+  max_mem: auto
+
+...
