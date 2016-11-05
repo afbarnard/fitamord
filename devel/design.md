@@ -23,27 +23,29 @@ Design
   * table defining study (subject_id, label, [start, end])
   * list of features
   * custom features (and other code) implemented in Python
-  * optional JSON configuration
+  * optional configuration
   * generated file prefix or names of individual output files
 
 * outputs
   * data in feature vector form for ML methods
   * support various output formats
-  * map for translating feature numbers to descriptions (JSON?)
-  * JSON configuration for reuse
+  * map for translating feature numbers to descriptions
+  * configuration for reuse
 
 * operational modes {gen, mk, make}?
   * only generate feature set (mk_features)
-  * only guess at and generate JSON configuration for a set of files
+  * only guess at and generate configuration for a set of files
     (make_config)
-    * no files results in generic JSON config for bootstrapping
+    * no files results in generic configuration for bootstrapping
+  * only load data into Sqlite (load)
   * generate feature vector data (gen_data)
   * merge_collect passes groups off to custom code (collect)
+  * generate random data for testing (mk_randdata)
 
 * CLI
   * data syntax: --data=<table_name>=<filename>
   * delimiter syntax: --delimiter=<delimiter> (global) or
-    --delimiter=<table_name>=<delimiter> for a particular table
+    --delimiter=<filename>=<delimiter> for a particular file
 
 * engine
   * read data with csv module
@@ -62,6 +64,18 @@ Design
     reprocessing
   * each feature vector should be output with a subject ID and a study /
     label ID to support debugging
+
+
+File Formats
+------------
+
+I have decided that all configuration will be done in YAML.  This is for
+a few reasons: JSON is not intended for human use due to quoting
+verbosity and lack of support for comments, writing configuration
+directly in Python is not portable to other languages, and INI format
+does not support any type of nesting.  Unfortunately, Python does not
+come with a YAML parser (unlike INI and JSON), and so this decision
+introduces an external dependency on PyYaml.
 
 
 Copyright (c) 2016 Aubrey Barnard.  This is free software released under

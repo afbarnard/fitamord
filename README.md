@@ -30,6 +30,13 @@ relation it came from.
 * Value event (subject_id, event_type, time, value)
 
 
+Requirements
+------------
+
+* Python >= 3.4
+* PyYaml >= 3.11
+
+
 -----
 
 Copyright (c) 2016 Aubrey Barnard.  This is free software released under
