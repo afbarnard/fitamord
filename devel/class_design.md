@@ -81,6 +81,7 @@ necessarily a Record.
 * name()::str # name of relation / table / stream / etc.
 * provenance()::str # filename, name of other table, name of generator function, etc.
 * header()::Header
+* error_handler::Callable
 * __iter__()
 
 
@@ -149,3 +150,7 @@ Enum EscapeStyle
 
 * char
 * doubling
+
+
+Copyright (c) 2016 Aubrey Barnard.  This is free software released under
+the MIT License.  See `LICENSE.txt` for details.
