@@ -3,3 +3,6 @@
 
 # Ignore file backups
 *~
+
+# Ignore compiled Python
+__pycache__
