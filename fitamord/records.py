@@ -42,7 +42,7 @@ class Header:
     def __init__(self, names=None, types=None, fields=None):
         self._fields = []
         self._names2idxs = {}
-        for name, typ in zip(names, types)):
+        for name, typ in zip(names, types):
             self._names2idxs[name] = len(self._fields)
             self._fields.append(Field(name, typ))
         for field in fields:
