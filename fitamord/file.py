@@ -1,12 +1,15 @@
-# Reading and processing tabular file formats
+# Reading and processing tabular file formats, file utilities
 #
 # Copyright (c) 2016 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
+import collections
+import csv
 import io
 import pathlib
 import re
 
+import barnapy.parse
 from . import records
 
 
@@ -209,3 +212,187 @@ class ContentReader:
     @property
     def line_num(self):
         return self._line_num
+
+
+# TODO redo parsing in terms of `is_*` and constructors b/c need to accomodate various forms of None and bool and extending to other types. LiteralParser class?
+# TODO add convenience methods to parse: int_or_none, int_or_orig, etc.
+
+class RecordException(Exception):
+
+    def __init__(self, source=None, index=None, record=None, *args, **kwargs):
+        self._source = source
+        self._index = index
+        self._record = record
+
+    def __str__(self):
+        return 'Bad record in {} at {}: {}'.format(self._source, self._index, self._record)
+
+
+class RecordValidationException(RecordException):
+    pass
+
+
+class RecordFormatException(RecordException):
+    pass
+
+
+def parse_literal(text):
+    if not text or text.isspace():
+        return None
+    else:
+        return barnapy.parse.literal(text)
+
+
+def make_record_transformer(header, transformation):
+    def record_transformer(record, line_num):
+        output = [None] * len(transformation)
+        for idx, (field, transform) in enumerate(
+                transformation.items()):
+            # Handle line_num specially
+            if field == 'line_num':
+                output[idx] = line_num
+                continue
+            # Fields can be identified by index or by name
+            field_idx = (field
+                         if isinstance(field, int)
+                         else header[field])
+            # Input records can have various lengths, so only transform
+            # a field that exists in the input.  Otherwise leave output
+            # as None.
+            if field_idx < len(record):
+                output[idx] = (transform(record[field_idx])
+                               if transform is not None
+                               else record[field_idx])
+        return output
+    return record_transformer
+
+
+def read_delimited_text(
+        # Input
+        file,
+        compression='auto',
+        input_name=None,
+        # File format
+        comment_char='#',
+        skip_blank_lines=True,
+        delimiter=',',
+        quote_char='"',
+        quote_quote_by_doubling=False,
+        escape_char='\\',
+        strip_space=False,
+        # Input records
+        field_names=None,
+        # Output records
+        output='parse',
+        field_parser=parse_literal,
+        # Record validation
+        validator=None,
+        # Error handling
+        error_handler=RecordException,
+        ):
+    """Read delimited text as an iterable of records.
+
+    """
+    # Default input name if not given
+    if input_name is None:
+        if isinstance(file, str):
+            input_name = file
+        elif isinstance(file, io.IOBase):
+            input_name = file.name
+        elif isinstance(file, pathlib.Path):
+            input_name = str(file)
+        else:
+            input_name = general.object_name(file)
+    # Read file according to specified format
+    reader = ContentReader(
+        file,
+        compression=compression,
+        comment_char=comment_char,
+        skip_blank_lines=skip_blank_lines,
+        )
+    # Create CSV reader with proper format dialect.  Get its iterator
+    # right away so that the first record can be treated as a header if
+    # specified.
+    csvreader = iter(csv.reader(
+        reader,
+        delimiter=delimiter,
+        quotechar=quote_char,
+        doublequote=quote_quote_by_doubling,
+        escapechar=escape_char,
+        skipinitialspace=strip_space,
+        ))
+    # Interpret field_names
+    names2idxs = None
+    if field_names is None or isinstance(field_names, dict):
+        names2idxs = field_names
+    elif field_names == 'header':
+        record = next(csvreader)
+        names2idxs = dict(
+            (name.strip(), idx) for (idx, name) in enumerate(record))
+    else:
+        names2idxs = dict(
+            (name, idx) for (idx, name) in enumerate(field_names))
+    # Set up output record processing
+    if output is None:
+        record_transformer = lambda record, line_num: record
+    elif output == 'parse':
+        record_transformer = (
+            lambda record, line_num:
+                [field_parser(field) for field in record])
+    else:
+        fields = collections.OrderedDict(output)
+        # Check output format so that later errors are more likely
+        # related to records than setup
+        for field, transform in fields.items():
+            # Check field names correspond
+            if (not isinstance(field, int)
+                    and field != 'line_num'
+                    and field not in names2idxs):
+                raise ValueError(
+                    'Field specified in output but not in field'
+                    ' names: {}'.format(field))
+            # Check transforms are callable
+            if (not hasattr(transform, '__call__')
+                    and transform is not None):
+                raise ValueError(
+                    'Not a callable output transformation: {}'
+                    .format((field, transform)))
+        # Make record transformer
+        record_transformer = make_record_transformer(names2idxs, fields)
+
+    # Process each record
+    for record in csvreader:
+        try:
+            # Transform record by projecting and converting fields
+            output_record = record_transformer(record, reader.line_num)
+            # Validate
+            if validator and not validator(output_record):
+                # TODO replace raising exception with validation handler to avoid overloading error handler?
+                raise RecordValidationException(
+                    input_name, reader.line_num, record)
+            # Output
+            yield output_record
+        except Exception as e:
+            if error_handler is None:
+                pass
+            elif (isinstance(error_handler, type)
+                  and issubclass(error_handler, Exception)):
+                # If the exception is already of the desired type, just
+                # raise
+                if isinstance(e, error_handler):
+                    raise
+                # If the desired type is RecordException, construct with
+                # field instead of message
+                elif issubclass(error_handler, RecordException):
+                    raise error_handler(
+                        input_name, reader.line_num, record) from e
+                # Otherwise raise a new exception from the current one
+                else:
+                    raise error_handler(
+                        'Bad record in {} at line {}: {}'.format(
+                            input_name, reader.line_num, record)
+                    ) from e
+            elif hasattr(error_handler, '__call__'):
+                error_handler(e, record, input_name, reader.line_num)
+            else:
+                raise
