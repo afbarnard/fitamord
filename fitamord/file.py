@@ -142,3 +142,70 @@ def read_content_lines(
             yield (line_num, line)
         else:
             yield line
+
+
+class ContentReader:
+    """Reader for the non-comment, non-blank lines of a file.
+
+    This is basically a class version of `read_content_lines`.  The
+    difference is that the reader exposes the line number as a property
+    whereas it is part of the iterable values in `read_content_lines`.
+
+    """
+
+    def __init__(
+            self,
+            file,
+            compression='auto',
+            comment_char='#',
+            skip_blank_lines=True,
+            ):
+        """Create a new ContentReader.
+
+        file: Filename (str), pathlib.Path object, or iterable of
+            strings (e.g. open text file)
+
+        compression: Compression type.  See `open` in this module.
+
+        comment_char: Initial character (after whitespace) that
+            identifies comment lines
+
+        skip_blank_lines: Whether to skip blank lines or treat them as
+            records
+
+        """
+        self._file = file
+        self._compression = compression
+        self._comment_char = comment_char
+        self._skip_blank_lines = skip_blank_lines
+        self._line_num = 0
+
+    def __iter__(self):
+        """Return an iterator over non-comment, non-blank lines."""
+        # Open file if needed
+        if isinstance(self._file, (str, pathlib.Path)):
+            self._file = read_lines(
+                self._file, compression=self._compression)
+        # Otherwise assume open file or other iterable of lines
+
+        # Create pattern for detecting comments.  Quote the comment
+        # character to avoid regex injection.
+        comment_pattern = re.compile('\s*' + re.escape(self._comment_char))
+
+        # Iterate over lines in the file.  Line numbers start at 1.
+        self._line_num = 0
+        for line in self._file:
+            self._line_num += 1
+            # Ignore comment lines
+            if comment_pattern.match(line) is not None:
+                continue
+            # Ignore blank lines (if desired)
+            elif self._skip_blank_lines and line.isspace():
+                continue
+            # Return content lines
+            else:
+                yield line
+
+    @property
+    def line_num(self):
+        return self._line_num
