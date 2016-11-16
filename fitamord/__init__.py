@@ -1,7 +1,10 @@
-# Top-level module definition with core functionality
-#
-# Copyright (c) 2016 Aubrey Barnard.  This is free software released
-# under the MIT License.  See `LICENSE.txt` for details.
+"""Fitamord is a framework for the intelligent transformation and
+modeling of relational data.
+
+Copyright (c) 2016 Aubrey Barnard.  This is free software released under
+the MIT License.  See `LICENSE.txt` for details.
+
+"""
 
 # Module Organization
 # -------------------

@@ -1,6 +1,7 @@
-# General-purpose functionality, utilities, and other things that don't
-# fit elsewhere
-#
+"""General-purpose functionality, utilities, and other things that don't
+fit elsewhere
+
+"""
 # Copyright (c) 2016 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
