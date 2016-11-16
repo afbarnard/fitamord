@@ -78,5 +78,61 @@ come with a YAML parser (unlike INI and JSON), and so this decision
 introduces an external dependency on PyYaml.
 
 
+What is a record transformation, anyway?
+----------------------------------------
+
+Most generally, a record transformation is a function that takes a
+record as input and produces a record as output.  The input header is
+assumed to be known and the transformation defines the output header.
+
+A transformation is projection --- add, delete, or rearrange fields ---
+plus (optionally) element-wise transformations.  Technically, each
+output field is a function of zero or more input fields, and the
+projection defines their order.  Thus, a record transformation
+corresponds to the head of a SQL select statement wherein the output
+columns are defined.
+
+But how does one construct record transformations in a convenient and
+user-friendly manner?  One could construct it like a collection with an
+`add` method that adds each successive column along with its
+transformation function.  A sequence of element-wise transformations
+could also be specified with each element-wise transformation having
+varying complexity.  The most general (and user-unfriendly case) is
+providing a function that maps records to records.
+
+Element-wise transformations as tuples:
+* (name,): Copy field to output
+* (name, name): Rename field in output
+* (name, type, func(field)): Apply unary function to field
+* (name, type, func(field), name): Apply field function with rename
+* (name, type, func(header, record)): Apply record function with rename
+
+After thinking about how to specify element-wise transformations, it
+seems appropriate to have a type, perhaps FieldConstructor, whose
+constructor can deal with the complexity and provide a uniform interface
+to the record transformation.  For convenience, RecordTransformation
+could have a method with keyword arguments corresponding to the field
+transformation constructor.
+
+Practical implementation considerations:
+* `row_num` is always accessible as a virtual field (0- or 1-based?)
+* Treat delimited text as columns of `str`
+* Support headers with only a partial set of names as not all names are
+  necessarily needed and fields are always accessible by index
+* Handle accessess of nonexistent columns by configuring an error or
+  default value.  But where to configure?  Record, Header,
+  Transformation?  Record or Header could always have a method similar
+  to dict.get(key, default), but calling that would still have to be
+  configured somewhere.
+* The result of any record transformation needs to be type-checked
+  against the output header, including for nullability and custom
+  constraints [future features].
+
+After consulting Wiktionary, the terminology will be "transformation"
+not "transform" because "transform" as a noun has a specific
+mathematical meaning.  (My uncertainty over the terminology is probably
+due to exposure to the mathematical use.)
+
+
 Copyright (c) 2016 Aubrey Barnard.  This is free software released under
 the MIT License.  See `LICENSE.txt` for details.
