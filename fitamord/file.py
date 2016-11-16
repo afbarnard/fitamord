@@ -13,12 +13,28 @@ import barnapy.parse
 from . import records
 
 
-class Format:
-    pass
+class Fingerprint:
 
+    def __init__(self):
+        pass
 
-class DelimitedText(records.RecordStream):
-    pass
+    def path(self):
+        return None
+
+    def size(self):
+        return None
+
+    def modification_time(self):
+        return None
+
+    def items(self): # Especially for writing to config
+        return ()
+
+    def init_from_file(self):
+        pass
+
+    def __eq__(self, other):
+        return False
 
 
 # Functional file API
@@ -216,6 +232,8 @@ class ContentReader:
 
 # TODO redo parsing in terms of `is_*` and constructors b/c need to accomodate various forms of None and bool and extending to other types. LiteralParser class?
 # TODO add convenience methods to parse: int_or_none, int_or_orig, etc.
+
+# TODO move exceptions to appropriate module
 
 class RecordException(Exception):
 

@@ -9,6 +9,7 @@ otherwise working with tabular data in delimited text files.
 
 
 import io
+import pathlib
 from enum import Enum
 
 from . import records
@@ -152,3 +153,67 @@ Format.PROGRAMMING_CSV = Format(
     escape_style='escaping',
     skip_blank_lines=True,
     )
+
+
+class File:
+
+    def __init__(
+            self,
+            path,
+            name=None,
+            format=None,
+            fingerprint=None,
+            header=None,
+            ):
+        self._path = (path
+                      if isinstance(path, pathlib.Path)
+                      else pathlib.Path(path))
+        self._name = (name
+                      if name is not None
+                      else self._path.basename)
+        self._format = format
+        self._fingerprint = fingerprint
+        self._header = header
+
+    @property
+    def path(self):
+        """Filesystem path of this file"""
+        return self._path
+
+    @property
+    def name(self):
+        """Name of the table represented by this file"""
+        return self._name
+
+    @property
+    def format(self):
+        return self._format
+
+    @property
+    def fingerprint(self):
+        return self._fingerprint
+
+    @property
+    def header(self):
+        return self._header
+
+    def reader(self, record_transformation='parse'):
+        pass
+
+    def init_from_file(self, what='all'):
+        pass
+
+    def __eq__(self, other):
+        # For comparing Files constructed from configuration to those
+        # constructed from the file content
+        pass
+
+
+class Reader(records.RecordStream):
+
+    def __init__(
+            self,
+            delimited_text_file,
+            record_transformation='parse',
+            ):
+        pass

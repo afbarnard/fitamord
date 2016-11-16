@@ -29,6 +29,9 @@ class Field:
     def isinstance(self, obj):
         return isinstance(obj, self._type)
 
+    def __repr__(self): # TODO for debugging
+        return super().__repr__()
+
 
 class Header:
     """A description of a collection of fields where each field has a name
@@ -40,6 +43,7 @@ class Header:
     """
 
     def __init__(self, names=None, types=None, fields=None):
+        # TODO make constructable from an iterable of names or a dictionary
         self._fields = []
         self._names2idxs = {}
         for name, typ in zip(names, types):
@@ -89,6 +93,12 @@ class Header:
                 or not self._fields[idx].isinstance(value)):
                 return False
         return True
+
+    def items(self): # TODO for writing config or making dict
+        return ()
+
+    def __repr__(self): # TODO for debugging
+        return super().__repr__()
 
 
 class Record:
@@ -189,4 +199,19 @@ class RecordStream:
 
 
 class Table(RecordStream):
-    pass
+
+    def __init__(
+            self,
+            backend='sqlite',
+            ):
+        pass
+
+
+class RecordTransformation:
+
+    def __init__(
+            self,
+            ):
+        pass
+
+    # strip space
