@@ -6,9 +6,16 @@ fit elsewhere
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
+def fq_typename(obj):
+    """Return the fully-qualified type name of an object or type."""
+    typ = type(obj) if not isinstance(obj, type) else obj
+    return '{}.{}'.format(typ.__module__, typ.__qualname__)
+
+
 def object_name(obj):
     """Return a unique name for the specific object."""
-    return obj.__class__.__name__ + '@' + hex(id(obj))
+    return '{}@{}'.format(fq_typename(obj), hex(id(obj)))
+
 
 def check_type(obj, typ, msg_template='Expected: {}, but got: {}'):
     """Check the type of an object and raise TypeError if incorrect."""
