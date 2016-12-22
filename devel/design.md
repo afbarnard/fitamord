@@ -65,6 +65,9 @@ Design
   * each feature vector should be output with a subject ID and a study /
     label ID to support debugging
 
+* YAML and config are separate, config is interpreted version of YAML
+* constructor objects to help transform YAML into config
+
 
 File Formats
 ------------
@@ -132,6 +135,18 @@ After consulting Wiktionary, the terminology will be "transformation"
 not "transform" because "transform" as a noun has a specific
 mathematical meaning.  (My uncertainty over the terminology is probably
 due to exposure to the mathematical use.)
+
+
+Loading a File into SQLite
+--------------------------
+
+* delete and define table, needs DB, table definition / schema (header)
+* read delimited file, needs filename and format
+* transform delimited file, needs transformation (or "parse")
+* loop over transformed records and insert each into table
+* need object to represent DB ("backend") with API (a la Spark?) for
+  querying catalog, deleting table, creating table, inserting, reading,
+  and sorting records
 
 
 Copyright (c) 2016 Aubrey Barnard.  This is free software released under
