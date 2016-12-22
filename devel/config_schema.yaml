@@ -57,7 +57,7 @@ version: no
 dump-config: no
 
 # Pattern when searching for data files in the current directory
-data-pattern: *.csv
+data-pattern: '*.csv'
 
 # Delimiter to use for all files.  Can be overridden by individual
 # files.  Setting this prevents file format auto-detection and sets
