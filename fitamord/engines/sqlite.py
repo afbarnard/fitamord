@@ -62,8 +62,10 @@ class SqliteDb(db.Database):
             yield from rows
             rows = cursor.fetchmany()
 
-    def namespaces(self): # TODO `pragma database_list;`
-        return ('main', 'temp')
+    def namespaces(self):
+        yield from (db_name
+                    for db_id, db_name, filename
+                    in self._execute_query('pragma database_list'))
 
     _list_objects_sql = 'select name, type, sql from {}.sqlite_master'
     _list_objects_with_types_sql = (
