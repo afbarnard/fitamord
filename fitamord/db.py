@@ -1,6 +1,6 @@
 """Databases and tables"""
 
-# Copyright (c) 2016 Aubrey Barnard.  This is free software released
+# Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 import re
@@ -53,10 +53,12 @@ class Database:
     def schema(self, name):
         return None
 
+    def interpret_sql_name(self, name):
+        return interpret_sql_name(name)
+
     def exists(self, name):
         """Whether an object with the given name exists in this DB"""
-        # FIXME interpret hierarchical dotted name
-        sql_name = interpret_sql_name(name)
+        sql_name = self.interpret_sql_name(name)
         namespace, obj_name = sql_name.rest_last()
         objects = self.objects(namespace=namespace)
         for obj in objects:
@@ -66,8 +68,7 @@ class Database:
 
     def typeof(self, name):
         """Return the type of the named object"""
-        # FIXME interpret hierarchical dotted name
-        sql_name = interpret_sql_name(name)
+        sql_name = self.interpret_sql_name(name)
         namespace, obj_name = sql_name.rest_last()
         objects = self.objects(namespace=namespace)
         for obj in objects:
@@ -107,7 +108,13 @@ class Table(records.RecordStream):
 # Basically, alphanumeric plus underscore but not starting with a digit,
 # or double quoted anything.  PostgreSQL uses doubling to embed double
 # quotes.
-_sql_identifier_pattern = re.compile(r'[a-zA-Z_]\w*|(?:"[^"]*")+')
+_sql_identifier_unquoted_regex = r'[a-zA-Z_]\w*'
+_sql_identifier_quoted_regex = r'"(?:[^"]+|"")+"'
+_sql_identifier_pattern = re.compile(
+    r'(?:{unq}|{quo})(?:\.(?:{unq}|{quo}))*'.format(
+        unq=_sql_identifier_unquoted_regex,
+        quo=_sql_identifier_quoted_regex,
+        ))
 
 def is_sql_identifier(text):
     return _sql_identifier_pattern.fullmatch(text) is not None
@@ -117,12 +124,37 @@ def assert_sql_identifier(text):
         raise DbSyntaxError('Bad SQL identifier: {}'.format(text))
 
 def unquote(text, quote='"'):
-    """Returns the text with one layer of quoting removed"""
-    # Not possible for a string of 0 or 1 characters to be quoted
-    if len(text) >= 2 and text[0] == quote and text[-1] == quote:
-        return text[1:-1]
-    else:
-        return text
+    """Returns the unquoted version of the text.
+
+    Treats doubled quote characters as specifying a single literal quote
+    character.  SQL uses this doubling style for escaping quote
+    characters.
+
+    """
+    result = []
+    quote_mode = False
+    char_idx = 0
+    while char_idx < len(text):
+        char = text[char_idx]
+        if char == quote:
+            if quote_mode:
+                # Is this the first of two consecutive quote characters
+                # (which encode a single literal quote character) or is
+                # this the end of the quoted text?
+                if (char_idx + 1 < len(text)
+                        and text[char_idx + 1] == quote):
+                    result.append(quote)
+                    char_idx += 1
+                else:
+                    quote_mode = False
+            else:
+                # If it was not quote mode and a quote character is
+                # encountered it is now quote mode
+                quote_mode = True
+        else:
+            result.append(char)
+        char_idx += 1
+    return ''.join(result)
 
 def interpret_sql_name(name):
     assert_sql_identifier(name)
@@ -151,7 +183,7 @@ class CompoundName:
     def __len__(self):
         return len(self._parts)
 
-    def __getindex__(self, index):
+    def __getitem__(self, index):
         return self._parts[index]
 
     def head(self, reverse=False):
@@ -159,16 +191,16 @@ class CompoundName:
             if reverse:
                 return self._parts[-1]
             else:
-                return self._parts[1]
+                return self._parts[0]
         else:
             return None
 
     def tail(self, reverse=False):
         if len(self._parts) > 1:
             if reverse:
-                return delimiter.join(self._parts[0:-1])
+                return self._delimiter.join(self._parts[0:-1])
             else:
-                return delimiter.join(self._parts[1:])
+                return self._delimiter.join(self._parts[1:])
         else:
             return None
 
