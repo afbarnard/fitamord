@@ -62,36 +62,44 @@ class SqliteDb(db.Database):
             yield from rows
             rows = cursor.fetchmany()
 
+    def interpret_sql_name(self, name):
+        dotted_name = super().interpret_sql_name(name)
+        # Check that the dotted name has no more than 2 components
+        if len(dotted_name) > 2:
+            raise db.DbSyntaxError(
+                'Too many name components: {}'.format(name))
+        return dotted_name
+
     def namespaces(self):
         yield from (db_name
                     for db_id, db_name, filename
                     in self._execute_query('pragma database_list'))
 
-    _list_objects_sql = 'select name, type, sql from {}.sqlite_master'
+    _list_objects_sql = 'select name, type, sql from {}'
     _list_objects_with_types_sql = (
-        'select name, type, sql from {}.sqlite_master where type in {}')
+        'select name, type, sql from {} where type in {}')
 
     def objects(self, types=None, namespace=None):
         """Return an iterable of DB objects as (name, type, sql) tuples"""
         # Default to `main` namespace
         if namespace is None:
             namespace = 'main'
-        # Check given namespace is a valid name
-        else:
-            db.assert_sql_identifier(namespace)
+        # Construct and check the catalog table name
+        catalog_table_name = namespace + '.sqlite_master'
+        self.interpret_sql_name(catalog_table_name)
         # Handle no type, a single type, or an iterable of types
         if types is None:
             parameters = None
-            query = self._list_objects_sql.format(namespace)
+            query = self._list_objects_sql.format(catalog_table_name)
         elif hasattr(types, '__iter__') and not isinstance(types, str):
             parameters = tuple(
                 db.DbObjectType.convert(o).name for o in types)
             query = self._list_objects_with_types_sql.format(
-                namespace, placeholders_for_params(parameters))
+                catalog_table_name, placeholders_for_params(parameters))
         else:
             parameters = (db.DbObjectType.convert(types).name,)
             query = self._list_objects_with_types_sql.format(
-                namespace, placeholders_for_params(parameters))
+                catalog_table_name, placeholders_for_params(parameters))
         # Generate the objects as (name, type, sql) tuples
         yield from self._execute_query(query, parameters)
 

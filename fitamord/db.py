@@ -3,6 +3,11 @@
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
+# TODO treat namespaces as objects (eventually, but not for now);
+# analogously to a filesystem, namespaces are directories and tables /
+# views / indices / etc. are files -> listing all the objects in a
+# namespace would include all nested namespaces
+
 import re
 from enum import Enum
 
@@ -121,7 +126,7 @@ def is_sql_identifier(text):
 
 def assert_sql_identifier(text):
     if not is_sql_identifier(text):
-        raise DbSyntaxError('Bad SQL identifier: {}'.format(text))
+        raise DbSyntaxError('Bad SQL identifier: "{}"'.format(text))
 
 def unquote(text, quote='"'):
     """Returns the unquoted version of the text.
