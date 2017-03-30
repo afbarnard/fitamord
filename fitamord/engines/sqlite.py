@@ -1,6 +1,6 @@
 """SQLite DB engine / backend"""
 
-# Copyright (c) 2016 Aubrey Barnard.  This is free software released
+# Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 import sqlite3
@@ -62,6 +62,11 @@ class SqliteDb(db.Database):
             yield from rows
             rows = cursor.fetchmany()
 
+    def _catalog_table_name(self, namespace):
+        # Construct and check the catalog table name
+        catalog_table_name = namespace + '.sqlite_master'
+        return self.interpret_sql_name(catalog_table_name)
+
     def interpret_sql_name(self, name):
         dotted_name = super().interpret_sql_name(name)
         # Check that the dotted name has no more than 2 components
@@ -84,27 +89,45 @@ class SqliteDb(db.Database):
         # Default to `main` namespace
         if namespace is None:
             namespace = 'main'
-        # Construct and check the catalog table name
-        catalog_table_name = namespace + '.sqlite_master'
-        self.interpret_sql_name(catalog_table_name)
+        catalog_table_name = self._catalog_table_name(namespace)
         # Handle no type, a single type, or an iterable of types
         if types is None:
             parameters = None
-            query = self._list_objects_sql.format(catalog_table_name)
+            query = self._list_objects_sql.format(
+                catalog_table_name.name)
         elif hasattr(types, '__iter__') and not isinstance(types, str):
             parameters = tuple(
                 db.DbObjectType.convert(o).name for o in types)
             query = self._list_objects_with_types_sql.format(
-                catalog_table_name, placeholders_for_params(parameters))
+                catalog_table_name.name,
+                placeholders_for_params(parameters))
         else:
             parameters = (db.DbObjectType.convert(types).name,)
             query = self._list_objects_with_types_sql.format(
-                catalog_table_name, placeholders_for_params(parameters))
+                catalog_table_name.name,
+                placeholders_for_params(parameters))
         # Generate the objects as (name, type, sql) tuples
         yield from self._execute_query(query, parameters)
 
-    def schema(self, name): # TODO a la `.schema ?TABLE?`
-        return None
+    _get_schema_sql = 'select sql from {} where name = ?'
+
+    def schema(self, name):
+        # Parse and check name
+        dotted_name = self.interpret_sql_name(name)
+        namespace, obj_name = dotted_name.rest_last()
+        # Default to `main` namespace
+        if namespace is None:
+            namespace = 'main'
+        catalog_table_name = self._catalog_table_name(namespace)
+        query = self._get_schema_sql.format(catalog_table_name.name)
+        schemas = list(self._execute_query(query, (obj_name,)))
+        if len(schemas) == 0:
+            raise db.DbError('Object not found: {}'.format(name))
+        elif len(schemas) > 1:
+            raise db.DbError(
+                'Multiple schemas for object: {}'.format(name))
+        else:
+            return schemas[0][0]
 
     def create_table(self, name, header): # TODO
         pass
