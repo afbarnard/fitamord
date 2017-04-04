@@ -56,9 +56,11 @@ class Database:
             yield obj[0]
 
     def schema(self, name):
+        """Return the schema of the named object"""
         return None
 
     def interpret_sql_name(self, name):
+        """Interpret the given SQL name according to this DB"""
         return interpret_sql_name(name)
 
     def exists(self, name):
@@ -82,9 +84,25 @@ class Database:
         raise DbError('Object not found: {}'.format(name))
 
     def create_table(self, name, header):
+        """Create and return a table with the given name and fields.
+
+        The table must not already exist.
+        """
         pass
 
+    def make_table(self, name, header):
+        """Create or replace or simply get the named table as needed.
+
+        Ensures the named table exists and has the given fields.
+        """
+        pass
+
+    def table(self, name):
+        """Return the table with the given name"""
+        return None
+
     def drop_table(self, name):
+        """Delete the named table and its data"""
         pass
 
 
@@ -106,6 +124,8 @@ class Table(records.RecordStream):
 
     def add_all(self, records):
         pass
+
+    # truncate, delete, etc.
 
 
 # Syntax of a SQL identifier, according to the PostgreSQL documentation:
