@@ -6,13 +6,15 @@
 # TODO treat namespaces as objects (eventually, but not for now);
 # analogously to a filesystem, namespaces are directories and tables /
 # views / indices / etc. are files -> listing all the objects in a
-# namespace would include all nested namespaces
+# namespace would list all child namespaces
 
 import re
 from enum import Enum
 
 from . import records
 
+
+# TODO remove initial "Db" from names (Go style advice)
 
 class DbError(Exception):
     pass
@@ -210,6 +212,12 @@ class CompoundName:
 
     def __getitem__(self, index):
         return self._parts[index]
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return type(self) == type(other) and self.name == other.name
 
     def head(self, reverse=False):
         if self._parts:
