@@ -110,16 +110,28 @@ class Database:
 
 class Table(records.RecordStream):
 
-    def __init__(self, db, name, header):
-        pass
+    def __init__(self, db, name, header, error_handler=None):
+        super().__init__(
+            records=None,
+            name=name,
+            header=header,
+            provenance=db,
+            error_handler=error_handler,
+            is_reiterable=True,
+            )
+        self._db = db
+        self._n_rows = 0
 
     @property
-    def name(self):
-        return None
+    def n_rows(self):
+        return self._n_rows
 
-    @property
-    def header(self):
-        return None
+    def __len__(self):
+        return self.n_rows
+
+    def __repr__(self):
+        return 'Table(db={!r}, name={!r}, header={!r})'.format(
+            self._db, self.name, self.header)
 
     def add(self, record):
         pass
@@ -246,6 +258,9 @@ class CompoundName:
     def __repr__(self):
         return '{}(name={!r}, delimiter={!r})'.format(
             self.__class__.__name__, self._name, self._delimiter)
+
+    def __str__(self):
+        return self.name
 
 
 class DottedName(CompoundName):

@@ -49,7 +49,7 @@ class Header:
     def __init__(self, fields=None, types=None, **names_to_types):
         """Create a header from the given fields.
 
-        The fields can be given as an interable of `Field`s, an iterable
+        The fields can be given as an iterable of `Field`s, an iterable
         of (name, type) pairs, both an iterable of names and a
         corresponding iterable of types, just an iterable of names
         (assumes types are all `object`), a mapping of names to types,
@@ -110,6 +110,10 @@ class Header:
 
     def __len__(self):
         return len(self._fields)
+
+    @property
+    def n_fields(self):
+        return len(self)
 
     def fields(self):
         return iter(self._fields)
@@ -199,6 +203,10 @@ class RecordStream:
         return self._provenance
 
     @property
+    def n_cols(self):
+        return self.header.n_fields
+
+    @property
     def is_reiterable(self):
         """Whether this stream can be iterated over multiple times."""
         return self._is_reiterable
@@ -216,17 +224,17 @@ class RecordStream:
 
         """
         if error_handler is None:
-            return self._records_iterator()
+            return self._record_iterator()
         else:
-            return self._records_error_iterator(error_handler)
+            return self._record_error_iterator(error_handler)
 
-    def _records_iterator(self):
+    def _record_iterator(self):
         """Return a plain record iterator without error handling.
 
         Subclasses should override this method to provide iteration over
         records if something more sophisticated than the default
         `iter(self._records)` is desired.  Note that
-        `_records_error_iterator` calls this method for its basic
+        `_record_error_iterator` calls this method for its basic
         iteration so there is no need to reimplement error handling.
         These two methods exist to enable clean subclassing and avoid
         the overhead of an extra generator when no error handling is
@@ -235,7 +243,7 @@ class RecordStream:
         """
         return iter(self._records)
 
-    def _records_error_iterator(self, error_handler=None):
+    def _record_error_iterator(self, error_handler=None):
         """Return a record iterator with the specified error handling.
 
         If no error handler is specified, exceptions are allowed to
@@ -244,7 +252,7 @@ class RecordStream:
         """
         # Manually iterate over records in order to catch exceptions.
         # Use an infinite loop to avoid repeating record handling code.
-        record_iterator = self._iterate_records()
+        record_iterator = self._record_iterator()
         record = None
         while True:
             try:
