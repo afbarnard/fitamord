@@ -11,6 +11,7 @@
 import re
 from enum import Enum
 
+from . import general
 from . import records
 
 
@@ -132,8 +133,8 @@ class Table(records.RecordStream):
         return self.n_rows
 
     def __repr__(self):
-        return 'Table(db={!r}, name={!r}, header={!r})'.format(
-            self._db, self.name, self.header)
+        return '{}(db={!r}, name={!r}, header={!r})'.format(
+            general.fq_typename(self), self._db, self.name, self.header)
 
     # Modification
 
