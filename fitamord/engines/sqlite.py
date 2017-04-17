@@ -10,10 +10,17 @@ from barnapy import logging
 
 from .. import db
 from .. import general
+from .. import records as recs
 
 
-def placeholders_for_params(params):
-    return '(?' + (', ?' * (len(params) - 1)) + ')'
+def placeholders_for_params(n_params):
+    return '(?' + (', ?' * (n_params - 1)) + ')'
+
+def gen_fetchmany(cursor):
+    rows = cursor.fetchmany()
+    while rows:
+        yield from rows
+        rows = cursor.fetchmany()
 
 
 class SqliteDb(db.Database):
@@ -57,7 +64,7 @@ class SqliteDb(db.Database):
         return '{}({!r})'.format(
             general.fq_typename(self), self._filename)
 
-    def _execute_query(self, query, parameters=None):
+    def execute_query(self, query, parameters=None):
         self._logger.info(
             'Executing query: {}; parameters: {}'
             .format(query, parameters))
@@ -66,10 +73,15 @@ class SqliteDb(db.Database):
             cursor.execute(query)
         else:
             cursor.execute(query, parameters)
-        rows = cursor.fetchmany()
-        while rows:
-            yield from rows
-            rows = cursor.fetchmany()
+        return cursor
+
+    def execute_many(self, query, parameters):
+        self._logger.info(
+            'Executing query: {}; parameters: {}'
+            .format(query, parameters))
+        cursor = self._connection.cursor()
+        cursor.executemany(query, parameters)
+        return cursor
 
     def _catalog_table_name(self, namespace):
         # Construct and check the catalog table name
@@ -98,7 +110,8 @@ class SqliteDb(db.Database):
     def namespaces(self):
         yield from (db_name
                     for db_id, db_name, filename
-                    in self._execute_query('pragma database_list'))
+                    in gen_fetchmany(
+                        self.execute_query('pragma database_list')))
 
     _list_objects_sql = 'select name, type, sql from {}'
     _list_objects_with_types_sql = (
@@ -120,14 +133,14 @@ class SqliteDb(db.Database):
                 db.DbObjectType.convert(o).name for o in types)
             query = self._list_objects_with_types_sql.format(
                 catalog_table_name.name,
-                placeholders_for_params(parameters))
+                placeholders_for_params(len(parameters)))
         else:
             parameters = (db.DbObjectType.convert(types).name,)
             query = self._list_objects_with_types_sql.format(
                 catalog_table_name.name,
-                placeholders_for_params(parameters))
+                placeholders_for_params(len(parameters)))
         # Generate the objects as (name, type, sql) tuples
-        yield from self._execute_query(query, parameters)
+        yield from gen_fetchmany(self.execute_query(query, parameters))
 
     _schema_sql = 'select sql from {} where name = ?'
 
@@ -135,7 +148,8 @@ class SqliteDb(db.Database):
         dotted_name, namespace, obj_name = self._process_name(name)
         catalog_table_name = self._catalog_table_name(namespace)
         query = self._schema_sql.format(catalog_table_name.name)
-        schemas = list(self._execute_query(query, (obj_name,)))
+        schemas = list(
+            gen_fetchmany(self.execute_query(query, (obj_name,))))
         if len(schemas) == 0:
             raise db.DbError('Object not found: {}'.format(name))
         elif len(schemas) > 1:
@@ -156,7 +170,7 @@ class SqliteDb(db.Database):
         fields_def = ', '.join(fields)
         # Build and run the query
         query = self._create_table_sql.format(name, fields_def)
-        rows = list(self._execute_query(query))
+        rows = list(gen_fetchmany(self.execute_query(query)))
         if rows:
             raise db.DbError('Create returned rows: {}'.format(rows))
         # Create proxy object
@@ -169,29 +183,74 @@ class SqliteDb(db.Database):
     def drop_table(self, name):
         dotted_name, namespace, obj_name = self._process_name(name)
         if dotted_name in self._tables:
+            self._tables[dotted_name].invalidate()
             del self._tables[dotted_name]
         query = self._drop_table_sql.format(name)
-        rows = list(self._execute_query(query))
+        rows = list(gen_fetchmany(self.execute_query(query)))
         if rows:
-            raise db.DbError('Delete returned rows: {}'.format(rows))
+            raise db.DbError('Drop table returned rows: {}'.format(rows))
 
     def table(self, name): # TODO
         dotted_name, namespace, obj_name = self._process_name(name)
         # Return the table from the cache if it exists
         if dotted_name in self._tables:
             return self._tables[dotted_name]
-        raise db.DbError(
-            'Cannot return table not created with this API'
-            ' (not yet implemented): {}'.format(name))
         # Get schema
         schema_str = self.schema(name)
         # Parse schema
         # Create header
+        header = None # FIXME actually parse header
         # Create proxy object
         table = Table(self, dotted_name, header)
         self._tables[dotted_name] = table
         return table
 
 
-class Table(db.Table): # TODO count_rows, records, etc.
-    pass
+class Table(db.Table):
+
+    _count_rows_sql = 'select count(*) from {}'
+
+    def count_rows(self):
+        query = self._count_rows_sql.format(self.name)
+        rows = list(gen_fetchmany(self._db.execute_query(query)))
+        if len(rows) != 1:
+            raise db.DbError('Not a single row: {}'.format(rows))
+        n_rows = rows[0][0]
+        self._n_rows = n_rows
+        return n_rows
+
+    _add_all_sql = 'insert into {} {} values {}'
+
+    def add_all(self, records):
+        header = (records.header
+                  if isinstance(records, recs.RecordStream)
+                  else self.header)
+        # Assemble query
+        col_names = '(' + ', '.join(header.names()) + ')'
+        param_placeholder = placeholders_for_params(self.n_cols)
+        query = self._add_all_sql.format(
+            self.name, col_names, param_placeholder)
+        # Run query
+        cursor = self._db.execute_many(query, records)
+        rows = list(gen_fetchmany(cursor))
+        if rows:
+            raise db.DbError('Insert returned rows: {}'.format(rows))
+        if cursor.rowcount > 0:
+            self._n_rows += cursor.rowcount
+
+    _clear_sql = 'delete from {}'
+
+    def clear(self):
+        query = self._clear_sql.format(self.name)
+        cursor = self._db.execute_query(query)
+        rows = list(gen_fetchmany(cursor))
+        if rows:
+            raise db.DbError('Delete returned rows: {}'.format(rows))
+        if cursor.rowcount > 0:
+            self._n_rows -= cursor.rowcount
+
+    def is_valid(self): # TODO check for validity in methods
+        return self._db is not None
+
+    def invalidate(self): # TODO rename to 'disconnect'?
+        self._db = None
