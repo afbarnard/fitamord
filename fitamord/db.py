@@ -122,6 +122,8 @@ class Table(records.RecordStream):
         self._db = db
         self._n_rows = 0
 
+    # Information
+
     @property
     def n_rows(self):
         return self._n_rows
@@ -133,13 +135,47 @@ class Table(records.RecordStream):
         return 'Table(db={!r}, name={!r}, header={!r})'.format(
             self._db, self.name, self.header)
 
+    # Modification
+
     def add(self, record):
         pass
 
     def add_all(self, records):
         pass
 
-    # truncate, delete, etc.
+    def update(self, predicate, cols, vals):
+        """update records matching predicate"""
+        pass
+
+    def delete(self, predicate):
+        """delete records matching predicate"""
+        pass
+
+    def clear(self):
+        """truncate table"""
+        pass
+
+    # Queries
+
+    def columns(self, cols):
+        """relational projection"""
+        pass
+
+    def select(self, predicate):
+        """relational selection"""
+        pass
+
+    def sort(self, col):
+        pass
+
+    def join(self, table, alias=None):
+        pass
+
+    # TODO create Spark RDD-like API where queries are constructed by
+    # composing operations that are lazily evaluated by compiling into a
+    # query plan and then running when the data is finally requested.
+    # Such an API could have Views and some sort of expression building
+    # all with the same API as a Table.
 
 
 # Syntax of a SQL identifier, according to the PostgreSQL documentation:
