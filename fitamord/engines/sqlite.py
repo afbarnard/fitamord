@@ -208,6 +208,8 @@ class SqliteDb(db.Database):
 
 class Table(db.Table):
 
+    # Reading
+
     _count_rows_sql = 'select count(*) from {}'
 
     def count_rows(self):
@@ -219,6 +221,15 @@ class Table(db.Table):
         n_rows = rows[0][0]
         self._n_rows = n_rows
         return n_rows
+
+    _select_rows_sql = 'select * from {}'
+
+    def _record_iterator(self):
+        self.assert_connected()
+        query = self._select_rows_sql.format(self.name)
+        return gen_fetchmany(self._db.execute_query(query))
+
+    # Writing
 
     _add_all_sql = 'insert into {} {} values {}'
 
@@ -251,6 +262,8 @@ class Table(db.Table):
             raise db.DbError('Delete returned rows: {}'.format(rows))
         if cursor.rowcount > 0:
             self._n_rows -= cursor.rowcount
+
+    # Bookkeeping
 
     def is_connected(self):
         return self._db is not None
