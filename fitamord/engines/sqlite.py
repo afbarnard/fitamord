@@ -183,14 +183,14 @@ class SqliteDb(db.Database):
     def drop_table(self, name):
         dotted_name, namespace, obj_name = self._process_name(name)
         if dotted_name in self._tables:
-            self._tables[dotted_name].invalidate()
+            self._tables[dotted_name].disconnect()
             del self._tables[dotted_name]
         query = self._drop_table_sql.format(name)
         rows = list(gen_fetchmany(self.execute_query(query)))
         if rows:
             raise db.DbError('Drop table returned rows: {}'.format(rows))
 
-    def table(self, name): # TODO
+    def table(self, name):
         dotted_name, namespace, obj_name = self._process_name(name)
         # Return the table from the cache if it exists
         if dotted_name in self._tables:
@@ -211,6 +211,7 @@ class Table(db.Table):
     _count_rows_sql = 'select count(*) from {}'
 
     def count_rows(self):
+        self.assert_connected()
         query = self._count_rows_sql.format(self.name)
         rows = list(gen_fetchmany(self._db.execute_query(query)))
         if len(rows) != 1:
@@ -222,6 +223,7 @@ class Table(db.Table):
     _add_all_sql = 'insert into {} {} values {}'
 
     def add_all(self, records):
+        self.assert_connected()
         header = (records.header
                   if isinstance(records, recs.RecordStream)
                   else self.header)
@@ -241,6 +243,7 @@ class Table(db.Table):
     _clear_sql = 'delete from {}'
 
     def clear(self):
+        self.assert_connected()
         query = self._clear_sql.format(self.name)
         cursor = self._db.execute_query(query)
         rows = list(gen_fetchmany(cursor))
@@ -249,8 +252,14 @@ class Table(db.Table):
         if cursor.rowcount > 0:
             self._n_rows -= cursor.rowcount
 
-    def is_valid(self): # TODO check for validity in methods
+    def is_connected(self):
         return self._db is not None
 
-    def invalidate(self): # TODO rename to 'disconnect'?
+    def assert_connected(self):
+        if not self.is_connected():
+            raise db.DbError(
+                'Operation not possible because the '
+                'table is not connected to a database.')
+
+    def disconnect(self):
         self._db = None
