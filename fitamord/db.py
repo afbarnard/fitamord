@@ -158,7 +158,7 @@ class Table(records.RecordStream):
 
     # Queries
 
-    def columns(self, cols):
+    def project(self, cols):
         """relational projection"""
         pass
 
@@ -166,7 +166,7 @@ class Table(records.RecordStream):
         """relational selection"""
         pass
 
-    def sort(self, col):
+    def order_by(self, cols):
         pass
 
     def join(self, table, alias=None):
