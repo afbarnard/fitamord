@@ -166,17 +166,64 @@ class Table(records.RecordStream):
         """relational selection"""
         pass
 
-    def order_by(self, cols):
+    def order_by(self, *cols):
+        """Returns a table-like object that iterates over its rows in the
+        specified order.
+
+        An order-by column specification is a column identified by name
+        or index, or it is a (column, order) pair where the order is one
+        of "asc" or "desc".  If only the column is given, ascending is
+        assumed.
+
+        """
         pass
 
     def join(self, table, alias=None):
         pass
+
+    # Helpers
+
+    def _interpret_order_by_columns(self, cols):
+        # Validate columns
+        columns = []
+        for col in cols:
+            col_spec = None
+            if isinstance(col, (str, int)):
+                col_spec = (col, 'asc')
+            elif (isinstance(col, tuple)
+                  and len(col) == 2
+                  and isinstance(col[0], (str, int))
+                  and isinstance(col[1], str)):
+                col_spec = col
+            else:
+                raise ValueError(
+                    'Not a (name, "asc"|"desc") order-by column '
+                    'specification: {!r}'.format(col))
+            # Check column specification
+            name, order = col_spec
+            if name not in self.header:
+                raise DbError(
+                    '{}: No such column: {}'.format(self.name, name))
+            if order not in ('asc', 'desc'):
+                raise ValueError(
+                    'Not an ordering keyword ("asc"|"desc"): {!r}'
+                    .format(order))
+            # Convert column indices to names
+            if isinstance(name, int):
+                name = self.header.name_at(name)
+                col_spec = name, order
+            columns.append(col_spec)
+        return columns
 
     # TODO create Spark RDD-like API where queries are constructed by
     # composing operations that are lazily evaluated by compiling into a
     # query plan and then running when the data is finally requested.
     # Such an API could have Views and some sort of expression building
     # all with the same API as a Table.
+    #
+    # For now this can be approximated by each query method returning a
+    # table-like object that incorporates the desired constraints /
+    # modifications.
 
 
 # Syntax of a SQL identifier, according to the PostgreSQL documentation:

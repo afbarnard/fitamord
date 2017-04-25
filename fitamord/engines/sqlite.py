@@ -3,6 +3,7 @@
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
+import copy
 import sqlite3
 import sys
 
@@ -213,6 +214,12 @@ class SqliteDb(db.Database):
 
 class Table(db.Table):
 
+    # Construction
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._order_by_cols = None
+
     # Reading
 
     _count_rows_sql = 'select count(*) from {}'
@@ -232,7 +239,23 @@ class Table(db.Table):
     def _record_iterator(self):
         self.assert_connected()
         query = self._select_rows_sql.format(self.name)
+        if self._order_by_cols:
+            cols = ', '.join(
+                name + ' ' + order
+                for (name, order) in self._order_by_cols)
+            query += ' order by ' + cols
         return gen_fetchmany(self._db.execute_query(query))
+
+    # Queries
+
+    def order_by(self, *cols):
+        self.assert_connected()
+        # Interpret and validate columns
+        columns = self._interpret_order_by_columns(cols)
+        # Create a return new table with ordering columns
+        table = copy.copy(self)
+        table._order_by_cols = columns
+        return table
 
     # Writing
 
