@@ -176,6 +176,8 @@ class Header:
     def __contains__(self, obj):
         if isinstance(obj, str):
             return obj in self._names2idxs
+        if isinstance(obj, int):
+            return 0 <= obj < len(self)
         # Treat (name, type) pair as a field as in the constructor
         if isinstance(obj, (tuple, list)) and len(obj) == 2:
             obj = Field(*obj)
