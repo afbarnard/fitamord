@@ -40,10 +40,13 @@ class SqliteDb(db.Database):
         self._logger.info('Connected')
         self._tables = {} # References to tables are circular
 
-    def __del__(self):
+    def close(self):
         """Close and invalidate the database connection"""
+        # Bail if already closed or not set up
+        if self._connection is None:
+            return
         self._logger.info('Closing DB connection')
-        # Clear references to tables
+        # Clear circular references to tables
         self._tables.clear()
         try:
             self._connection.close()
@@ -55,6 +58,8 @@ class SqliteDb(db.Database):
         finally:
             # Release reference no matter what
             self._connection = None
+
+    __del__ = close
 
     @property
     def name(self):
@@ -276,3 +281,6 @@ class Table(db.Table):
 
     def disconnect(self):
         self._db = None
+
+    # Remove circular references
+    __del__ = disconnect
