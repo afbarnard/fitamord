@@ -36,6 +36,14 @@ class Field:
         return 'Field(name={!r}, typ={})'.format(
             self.name, self.type.__name__)
 
+    def __eq__(self, other):
+        return (type(self) == type(other)
+                and self.name == other.name
+                and self.type == other.type)
+
+    def __hash__(self):
+        return hash((self.name, self.type))
+
 
 class Header:
     """A definition of a collection of fields where each field has a name
@@ -164,6 +172,17 @@ class Header:
     def __repr__(self):
         return ('Header((' + ', '.join(repr(f) for f in self._fields)
                 + '))')
+
+    def __contains__(self, obj):
+        if isinstance(obj, str):
+            return obj in self._names2idxs
+        # Treat (name, type) pair as a field as in the constructor
+        if isinstance(obj, (tuple, list)) and len(obj) == 2:
+            obj = Field(*obj)
+        if isinstance(obj, Field):
+            return (obj.name in self._names2idxs
+                    and obj == self.field_of(obj.name))
+        return False
 
 
 class Record:
