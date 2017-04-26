@@ -156,15 +156,22 @@ class Table(records.RecordStream):
         """truncate table"""
         pass
 
-    # Queries
+    # Queries # TODO push up to RecordStream?
 
-    def project(self, cols):
-        """relational projection"""
-        pass
+    def project(self, *cols):
+        """Returns a table-like object that includes only the specified columns.
+
+        A column is identified by name or index.
+
+        """
+        return self # Dummy implementation
 
     def select(self, predicate):
-        """relational selection"""
-        pass
+        """Returns a table-like object that includes only those rows that match
+        the given predicate.
+
+        """
+        return self # Dummy implementation
 
     def order_by(self, *cols):
         """Returns a table-like object that iterates over its rows in the
@@ -176,10 +183,14 @@ class Table(records.RecordStream):
         assumed.
 
         """
-        pass
+        return self # Dummy implementation
 
     def join(self, table, alias=None):
-        pass
+        """Returns a table-like object that includes rows from this table and
+        the given table.
+
+        """
+        return self # Dummy implementation
 
     # Helpers
 
