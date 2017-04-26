@@ -1,6 +1,5 @@
-"""Core record processing
+"""Core record processing"""
 
-"""
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
@@ -45,7 +44,7 @@ class Field:
         return hash((self.name, self.type))
 
 
-class Header:
+class Header: # TODO convert to subclass of NamedItems
     """A definition of a collection of fields where each field has a name
     and a type.
 
@@ -200,20 +199,25 @@ class RecordStream:
 
     """
 
-    def __init__(self, records, name=None, header=None, provenance=None,
-                 error_handler=None, is_reiterable=False):
+    def __init__(
+            self, records, name=None, header=None, provenance=None,
+            error_handler=None, is_reiterable=False):
         self._records = records
-        self._name = name if name is not None else '<unknown>'
+        self._name = name
         self._header = header
-        self._provenance = (provenance
-                            if provenance is not None
-                            else general.object_name(records))
+        self._provenance = provenance
         self._error_handler = error_handler
         self._is_reiterable = is_reiterable
 
+    def has_name(self):
+        return self._name is not None
+
     @property
     def name(self):
-        return self._name
+        return self._name if self._name is not None else '<unknown>'
+
+    def has_header(self):
+        return self._header is not None
 
     @property
     def header(self):
@@ -221,7 +225,9 @@ class RecordStream:
 
     @property
     def provenance(self):
-        return self._provenance
+        return (self._provenance
+                if self._provenance is not None
+                else general.object_name(self._records))
 
     @property
     def n_cols(self):
@@ -286,6 +292,14 @@ class RecordStream:
                 else:
                     raise e
             yield record
+
+    def __repr__(self):
+        return ('{}(name={!r}, header={!r}, provenance={!r}, '
+                'error_handler={!r}, is_reiterable={!r}, records={!r})'
+                .format(general.fq_typename(self), self._name,
+                        self._header, self._provenance,
+                        self._error_handler, self._is_reiterable,
+                        self._records))
 
 
 class Table(RecordStream):
