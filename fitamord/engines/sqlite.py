@@ -184,7 +184,7 @@ class SqliteDb(db.Database):
         if rows:
             raise db.DbError('Create returned rows: {}'.format(rows))
         # Create proxy object
-        table = Table(self, dotted_name, header)
+        table = Table(self, dotted_name.name, header)
         self._tables[dotted_name] = table
         return table
 
@@ -211,7 +211,7 @@ class SqliteDb(db.Database):
         # Create header
         header = None # FIXME actually parse header
         # Create proxy object
-        table = Table(self, dotted_name, header)
+        table = Table(self, dotted_name.name, header)
         self._tables[dotted_name] = table
         return table
 
