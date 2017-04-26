@@ -48,7 +48,11 @@ class SqliteDb(db.Database):
             return
         self._logger.info('Closing DB connection')
         # Clear circular references to tables
-        self._tables.clear()
+        if self._tables:
+            for table in self._tables.values():
+                table.disconnect()
+            self._tables.clear()
+        # Close the DB connection
         try:
             self._connection.close()
         except Exception as e:
