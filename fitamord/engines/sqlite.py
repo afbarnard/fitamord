@@ -222,6 +222,7 @@ class Table(db.Table):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._project_cols = None
         self._order_by_cols = None
 
     # Reading
@@ -238,11 +239,14 @@ class Table(db.Table):
         self._n_rows = n_rows
         return n_rows
 
-    _select_rows_sql = 'select * from {}'
+    _select_rows_sql = 'select {} from {}'
 
     def _record_iterator(self):
         self.assert_connected()
-        query = self._select_rows_sql.format(self.name)
+        cols = (', '.join(self._project_cols)
+                if self._project_cols
+                else '*')
+        query = self._select_rows_sql.format(cols, self.name)
         if self._order_by_cols:
             cols = ', '.join(
                 name + ' ' + order
@@ -252,11 +256,20 @@ class Table(db.Table):
 
     # Queries
 
+    def project(self, *cols):
+        self.assert_connected()
+        # Interpret and validate columns
+        columns = [self._interpret_column(col) for col in cols]
+        # Create new table with desired columns
+        table = copy.copy(self)
+        table._project_cols = columns
+        return table
+
     def order_by(self, *cols):
         self.assert_connected()
         # Interpret and validate columns
-        columns = self._interpret_order_by_columns(cols)
-        # Create a return new table with ordering columns
+        columns = [self._interpret_order_by_column(col) for col in cols]
+        # Create new table with desired ordering
         table = copy.copy(self)
         table._order_by_cols = columns
         return table

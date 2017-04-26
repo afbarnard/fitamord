@@ -340,37 +340,47 @@ class RecordStream:
 
     # Helpers
 
-    def _interpret_order_by_columns(self, cols):
-        # Validate columns
-        columns = []
-        for col in cols:
-            col_spec = None
-            if isinstance(col, (str, int)):
-                col_spec = (col, 'asc')
-            elif (isinstance(col, tuple)
-                  and len(col) == 2
-                  and isinstance(col[0], (str, int))
-                  and isinstance(col[1], str)):
-                col_spec = col
-            else:
-                raise ValueError(
-                    'Not a (name, "asc"|"desc") order-by column '
-                    'specification: {!r}'.format(col))
-            # Check column specification
-            name, order = col_spec
-            if name not in self.header:
-                raise DbError(
-                    '{}: No such column: {}'.format(self.name, name))
-            if order not in ('asc', 'desc'):
-                raise ValueError(
-                    'Not an ordering keyword ("asc"|"desc"): {!r}'
-                    .format(order))
-            # Convert column indices to names
-            if isinstance(name, int):
-                name = self.header.name_at(name)
-                col_spec = name, order
-            columns.append(col_spec)
-        return columns
+    def _interpret_column(self, col):
+        # Interpret column specification
+        if not isinstance(col, (str, int)):
+            raise ValueError(
+                'Not a column name or index: {!r}'.format(col))
+        # Check column exists
+        if col not in self.header:
+            raise DbError(
+                '{}: No such column: {}'.format(self.name, col))
+        # Convert column index to name
+        if isinstance(col, int):
+            col = self.header.name_at(col)
+        return col
+
+    def _interpret_order_by_column(self, col):
+        # Interpret column specification
+        col_spec = None
+        if isinstance(col, (str, int)):
+            col_spec = (col, 'asc')
+        elif (isinstance(col, tuple)
+              and len(col) == 2
+              and isinstance(col[0], (str, int))
+              and isinstance(col[1], str)):
+            col_spec = col
+        else:
+            raise ValueError(
+                'Not a (name, "asc"|"desc") order-by column '
+                'specification: {!r}'.format(col))
+        # Check column specification
+        name, order = col_spec
+        if name not in self.header:
+            raise DbError(
+                '{}: No such column: {}'.format(self.name, name))
+        if order not in ('asc', 'desc'):
+            raise ValueError(
+                'Not an ordering keyword ("asc"|"desc"): {!r}'
+                .format(order))
+        # Convert column index to name
+        if isinstance(name, int):
+            name = self.header.name_at(name)
+        return name, order
 
 
 class Table(RecordStream):
