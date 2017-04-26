@@ -2,7 +2,7 @@
 fit elsewhere
 
 """
-# Copyright (c) 2016 Aubrey Barnard.  This is free software released
+# Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -14,7 +14,7 @@ def fq_typename(obj):
 
 def object_name(obj):
     """Return a unique name for the specific object."""
-    return '{}@{}'.format(fq_typename(obj), hex(id(obj)))
+    return '<{}@{}>'.format(fq_typename(obj), hex(id(obj)))
 
 
 def check_type(obj, typ, msg_template='Expected: {}, but got: {}'):
