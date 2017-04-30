@@ -26,7 +26,10 @@ class NamedItems:
         if names2items:
             named_items_iterables.append(names2items.items())
         for named_item in itools.chain(*named_items_iterables):
-            self.add(*named_item)
+            self.add_named_item(named_item)
+
+    def add_named_item(self, named_item):
+        self.add(*named_item)
 
     def add(self, name, item):
         if name in self._names2idxs:

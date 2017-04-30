@@ -18,14 +18,14 @@ logging.default_config()
 
 # Define headers for test data
 
-demographics_header = records.Header((
+demographics_header = records.Header(
     ('patient_id', int),
     ('birth_year', int),
     ('gender', str),
     ('age_at_death', float),
-    ))
+    )
 
-diagnoses_header = records.Header((
+diagnoses_header = records.Header(
     ('patient_id', int),
     ('dx_code', str),
     ('age', float),
@@ -41,9 +41,9 @@ diagnoses_header = records.Header((
     ('dx_code_subcat', str),
     ('dx_code_subcat_desc', str),
     ('data_source', int),
-    ))
+    )
 
-meds_header = records.Header((
+meds_header = records.Header(
     ('patient_id', int),
     ('age', float),
     ('gcn_seq_num', int),
@@ -61,7 +61,7 @@ meds_header = records.Header((
     ('therapeutic_specific_desc', str),
     ('drug_source', int),
     ('data_source', int),
-    ))
+    )
 
 sqldb = sqlite.SqliteDb(sys.argv[1])
 demos_tab = sqldb.table('demographics')
