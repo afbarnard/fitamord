@@ -105,3 +105,8 @@ class NamedItems:
         return (self.has_name(obj)
                 or self.has_named_item(obj)
                 or self.has_item(obj))
+
+    def __eq__(self, obj):
+        return (type(self) == type(obj)
+                and self._names == obj._names
+                and self._items == obj._items)

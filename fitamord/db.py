@@ -102,7 +102,7 @@ class Database:
         if self.exists(name):
             if self.typeof(name) == DbObjectType.table:
                 table = self.table(name)
-                if table.header == header: # FIXME
+                if table.header == header:
                     return table
                 else:
                     self.drop_table(name)
