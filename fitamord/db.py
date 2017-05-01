@@ -98,7 +98,21 @@ class Database:
 
         Ensures the named table exists and has the given fields.
         """
-        pass
+        # Check if a table with the given name exists
+        if self.exists(name):
+            if self.typeof(name) == DbObjectType.table:
+                table = self.table(name)
+                if table.header == header: # FIXME
+                    return table
+                else:
+                    self.drop_table(name)
+                    return self.create_table(name, header)
+            else:
+                DbError(
+                    'Already exists but is not a table: {}'
+                    .format(name))
+        else:
+            return self.create_table(name, header)
 
     def table(self, name):
         """Return the table with the given name"""
