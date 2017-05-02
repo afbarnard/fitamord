@@ -23,6 +23,15 @@ def gen_fetchmany(cursor):
         yield from rows
         rows = cursor.fetchmany()
 
+python2sqlite_types = {
+    bytes: 'blob',
+    float: 'real',
+    int: 'integer',
+    # SQLite allows a column definition without a specific type
+    object: '',
+    str: 'text',
+    }
+
 
 class SqliteDb(db.Database):
     """Represents a SQLite database and provides schema-level operations"""
@@ -175,8 +184,10 @@ class SqliteDb(db.Database):
         # Create the fields definition from the header
         fields = []
         for field in header:
-            # TODO translate types
-            field_def = '{} {}'.format(field.name, field.type.__name__)
+            field_def = field.name
+            field_type = self.translate_type(field.type)
+            if field_type:
+                field_def += ' ' + field_type
             fields.append(field_def)
         fields_def = ', '.join(fields)
         # Build and run the query
@@ -215,6 +226,16 @@ class SqliteDb(db.Database):
         table = Table(self, dotted_name.name, header)
         self._tables[dotted_name] = table
         return table
+
+    def translate_type(self, python_type):
+        # Use a text representation if no other specific type
+        return python2sqlite_types.get(python_type, 'text')
+
+    def commit(self):
+        self._connection.commit()
+
+    def rollback(self):
+        self._connection.rollback()
 
 
 class Table(db.Table):
@@ -293,9 +314,9 @@ class Table(db.Table):
         cursor = self._db.execute_many(query, records)
         rows = list(gen_fetchmany(cursor))
         if rows:
-            self._db._connection.rollback() # FIXME
+            self._db.rollback()
             raise db.DbError('Insert returned rows: {}'.format(rows))
-        self._db._connection.commit() # FIXME
+        self._db.commit()
         if cursor.rowcount > 0:
             self._n_rows += cursor.rowcount
 
@@ -307,9 +328,9 @@ class Table(db.Table):
         cursor = self._db.execute_query(query)
         rows = list(gen_fetchmany(cursor))
         if rows:
-            self._db._connection.rollback() # FIXME
+            self._db.rollback()
             raise db.DbError('Delete returned rows: {}'.format(rows))
-        self._db._connection.commit() # FIXME
+        self._db.commit()
         if cursor.rowcount > 0:
             self._n_rows -= cursor.rowcount
 
