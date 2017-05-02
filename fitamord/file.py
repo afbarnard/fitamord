@@ -1,7 +1,6 @@
-"""File utilities
+"""File utilities"""
 
-"""
-# Copyright (c) 2016 Aubrey Barnard.  This is free software released
+# Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 import collections
@@ -210,14 +209,18 @@ class ContentReader:
 
         # Create pattern for detecting comments.  Quote the comment
         # character to avoid regex injection.
-        comment_pattern = re.compile('\s*' + re.escape(self._comment_char))
+        comment_pattern = (
+            re.compile('\s*' + re.escape(self._comment_char))
+            if self._comment_char
+            else None)
 
         # Iterate over lines in the file.  Line numbers start at 1.
         self._line_num = 0
         for line in self._file:
             self._line_num += 1
             # Ignore comment lines
-            if comment_pattern.match(line) is not None:
+            if (comment_pattern is not None
+                    and comment_pattern.match(line) is not None):
                 continue
             # Ignore blank lines (if desired)
             elif self._skip_blank_lines and line.isspace():
@@ -286,7 +289,7 @@ def make_record_transformer(header, transformation):
     return record_transformer
 
 
-def read_delimited_text(
+def read_delimited_text( # TODO replace with better API as described in 5c17df2d
         # Input
         file,
         compression='auto',
@@ -309,9 +312,7 @@ def read_delimited_text(
         # Error handling
         error_handler=RecordException,
         ):
-    """Read delimited text as an iterable of records.
-
-    """
+    """Read delimited text as an iterable of records."""
     # Default input name if not given
     if input_name is None:
         if isinstance(file, str):

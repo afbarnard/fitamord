@@ -175,6 +175,7 @@ class SqliteDb(db.Database):
         # Create the fields definition from the header
         fields = []
         for field in header:
+            # TODO translate types
             field_def = '{} {}'.format(field.name, field.type.__name__)
             fields.append(field_def)
         fields_def = ', '.join(fields)
@@ -292,7 +293,9 @@ class Table(db.Table):
         cursor = self._db.execute_many(query, records)
         rows = list(gen_fetchmany(cursor))
         if rows:
+            self._db._connection.rollback() # FIXME
             raise db.DbError('Insert returned rows: {}'.format(rows))
+        self._db._connection.commit() # FIXME
         if cursor.rowcount > 0:
             self._n_rows += cursor.rowcount
 
@@ -304,7 +307,9 @@ class Table(db.Table):
         cursor = self._db.execute_query(query)
         rows = list(gen_fetchmany(cursor))
         if rows:
+            self._db._connection.rollback() # FIXME
             raise db.DbError('Delete returned rows: {}'.format(rows))
+        self._db._connection.commit() # FIXME
         if cursor.rowcount > 0:
             self._n_rows -= cursor.rowcount
 

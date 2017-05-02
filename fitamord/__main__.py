@@ -22,6 +22,7 @@ def main(args=None):
 
     # Start logging
     logging.default_config()
+    logger = logging.getLogger('main')
 
     # Read config, process command line, create environment
 
@@ -54,19 +55,17 @@ def main(args=None):
         # Table name
         table_name = os.path.basename(filename).split('.')[0]
         # Determine file format and table schema
-        pipe_separated = delimited.Format(delimiter='|')
-        header = records.Header(
-            ('patient_id', int), ('age', float), ('event', str))
-        # Set up loading transformations (?)
+        tabular_file = delimited.File(filename)
+        tabular_file.init_from_file()
+        # Set up loading transformations (?) # TODO
         # Read delimited file
-        tabular_file = delimited.File(
-            filename, table_name, pipe_separated, header)
         reader = tabular_file.reader() # TODO enable readers to be context manager
         # Bulk load records from file into table
-        table = db.make_table(table_name, header)
+        table = db.make_table(table_name, tabular_file.header)
         table.add_all(reader)
-        # commit?
-        # close file?
+        logger.info(
+            'Loaded {} records from {} into {}'
+            .format(table.count_rows(), filename, table.name))
 
     # Above: ahdb.  Below: fitamord.
 

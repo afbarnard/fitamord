@@ -4,14 +4,16 @@ Classes and functions for describing, reading, transforming, and
 otherwise working with tabular data in delimited text files.
 
 """
-# Copyright (c) 2016 Aubrey Barnard.  This is free software released
+# Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
+import csv
 import io
 import pathlib
 from enum import Enum
 
+from . import file
 from . import records
 
 
@@ -160,20 +162,20 @@ class File:
     def __init__(
             self,
             path,
-            name=None,
             format=None,
-            fingerprint=None,
+            name=None,
             header=None,
+            fingerprint=None,
             ):
         self._path = (path
                       if isinstance(path, pathlib.Path)
                       else pathlib.Path(path))
         self._name = (name
                       if name is not None
-                      else self._path.basename)
+                      else self._path.name.split('.')[0])
         self._format = format
-        self._fingerprint = fingerprint
         self._header = header
+        self._fingerprint = fingerprint
 
     @property
     def path(self):
@@ -197,11 +199,51 @@ class File:
     def header(self):
         return self._header
 
-    def reader(self, record_transformation='parse'):
-        pass
+    def reader(self, record_transformation=None):
+        return Reader(
+            path=self.path,
+            format=self.format,
+            name=self.name,
+            header=self.header,
+            record_transformation=record_transformation,
+            )
 
-    def init_from_file(self, what='all'):
-        pass
+    def init_from_file(self, what='all', sample_size=1048576):
+        # Interpret `what` # TODO
+        # Read the first part of the file to use as a sample
+        with file.open(self.path, 'rt') as csv_file:
+            sample = csv_file.read(sample_size)
+            # Analyze the sample to determine delimiter and header
+            dialect = csv.excel # Default to Excel format
+            has_header = False
+            sniffer = csv.Sniffer()
+            try:
+                dialect = sniffer.sniff(sample)
+                has_header = sniffer.has_header(sample)
+            except:
+                pass
+            csv_file.seek(0)
+            csv_reader = csv.reader(csv_file, dialect=dialect)
+            row = next(csv_reader)
+        # Build format
+        if what in ('all', 'format') or 'format' in what:
+            self._format = Format(
+                comment_char=None,
+                delimiter=dialect.delimiter,
+                quote_char=dialect.quotechar,
+                escape_char=dialect.escapechar,
+                escape_style=(EscapeStyle.doubling
+                              if dialect.doublequote
+                              else EscapeStyle.escaping),
+                skip_blank_lines=True,
+                )
+        # Build header
+        if what in ('all', 'header') or 'header' in what:
+            if has_header:
+                names = row
+            else:
+                names = ['x' + str(i + 1) for i in range(len(row))]
+            self._header = records.Header(names=names)
 
     def __eq__(self, other):
         # For comparing Files constructed from configuration to those
@@ -213,7 +255,48 @@ class Reader(records.RecordStream):
 
     def __init__(
             self,
-            delimited_text_file,
-            record_transformation='parse',
+            path,
+            format=None,
+            name=None,
+            header=None,
+            record_transformation=None,
+            error_handler=None,
             ):
-        pass
+        self._path = (path
+                      if isinstance(path, pathlib.Path)
+                      else pathlib.Path(path))
+        self._name = (name
+                      if name is not None
+                      else self._path.name.split('.')[0])
+        self._format = format
+        self._header = header
+        self._rec_txform = record_transformation
+        # Initialize superclass
+        super().__init__(
+            records=None,
+            name=self.name,
+            header=self.header,
+            provenance=self.path,
+            error_handler=error_handler,
+            is_reiterable=True,
+            )
+
+    @property
+    def path(self):
+        return self._path
+
+    def _record_iterator(self):
+        return file.read_delimited_text(
+            file=self.path,
+            comment_char=self._format.comment_char,
+            skip_blank_lines=self._format.skip_blank_lines,
+            delimiter=self._format.delimiter,
+            quote_char=self._format.quote_char,
+            quote_quote_by_doubling=(
+                self._format.escape_style == EscapeStyle.doubling),
+            escape_char=self._format.escape_char,
+            strip_space=True,
+            #field_names=list(self.header.names()),
+            output=self._rec_txform,
+            error_handler=self._error_handler,
+            )
