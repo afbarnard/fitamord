@@ -300,3 +300,30 @@ class Reader(records.RecordStream):
             output=self._rec_txform,
             error_handler=self._error_handler,
             )
+
+
+def project_parse_fields(record, parsers, is_missing, field_idxs=None):
+    new_record = [None] * len(parsers)
+    for out_idx in range(len(parsers)):
+        # Find the input index corresponding to the output index
+        in_idx = (field_idxs[out_idx]
+                  if field_idxs is not None
+                  else out_idx)
+        # Leave field as None if it doesn't exist in record
+        if in_idx >= len(record):
+            continue
+        field = record[in_idx]
+        # Leave field as None if missing
+        if is_missing(field):
+            continue
+        # Get the parser and parse the field if defined
+        parser = parsers[out_idx]
+        if parser is None:
+            new_record[out_idx] = field
+            continue
+        value, ok = parser(field)
+        if ok:
+            new_record[out_idx] = value
+        else:
+            new_record[out_idx] = field
+    return new_record
