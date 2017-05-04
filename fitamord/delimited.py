@@ -8,6 +8,7 @@ otherwise working with tabular data in delimited text files.
 # under the MIT License.  See `LICENSE.txt` for details.
 
 import collections
+import copy
 import csv
 import io
 import itertools as itools
@@ -274,7 +275,7 @@ class File:
         pass
 
 
-class Reader(records.RecordStream):
+class Reader(records.RecordStream): # TODO enable to be context manager?
 
     def __init__(
             self,
@@ -294,7 +295,7 @@ class Reader(records.RecordStream):
         self._format = format
         self._header = header
         self._rec_txform = record_transformation
-        # Initialize superclass
+        self._inv_projection = None
         super().__init__(
             records=None,
             name=self.name,
@@ -308,48 +309,87 @@ class Reader(records.RecordStream):
     def path(self):
         return self._path
 
+    def project(self, *columns):
+        # Must have a header in order to project
+        if self.header is None:
+            raise ValueError(
+                'Cannot project using invalid header: None')
+        # Create inverse projection (new field idxs to old field idxs)
+        new2old_field_idxs = []
+        for column in columns:
+            # Verify column name or index
+            if not self.header.has_field(column):
+                raise ValueError('No such column: {}'.format(column))
+            old_idx = self.header.index_of(column)
+            # Compose with existing projection (if any)
+            if self._inv_projection is not None:
+                old_idx = self._inv_projection[old_idx]
+            new2old_field_idxs.append(old_idx)
+        # Create projected header
+        header = self.header.project(*columns)
+        # Create new record stream and update it with the projection
+        records = copy.copy(self)
+        records._header = header
+        records._inv_projection = new2old_field_idxs
+        return records
+
     def _record_iterator(self):
-        return file.read_delimited_text(
-            file=self.path,
+        # Must have a format in order to read the file
+        if self._format is None:
+            raise ValueError(
+                'Cannot read file using invalid format: None')
+        # Create reader for content
+        reader = file.ContentReader(
+            self.path,
             comment_char=self._format.comment_char,
             skip_blank_lines=self._format.skip_blank_lines,
+            )
+        # Create CSV reader
+        csv_reader = csv.reader(
+            reader,
             delimiter=self._format.delimiter,
-            quote_char=self._format.quote_char,
-            quote_quote_by_doubling=(
+            quotechar=self._format.quote_char,
+            escapechar=self._format.escape_char,
+            doublequote=(
                 self._format.escape_style == EscapeStyle.doubling),
-            escape_char=self._format.escape_char,
-            strip_space=True,
-            #field_names=list(self.header.names()),
-            output=self._rec_txform,
-            error_handler=self._error_handler,
+            skipinitialspace=True,
+            )
+        # Set up field parsing
+        parsers = [_types2parsers.get(typ, None)
+                   for typ in self.header.types()]
+        # Make record processing loop
+        return project_transform_records(
+            csv_reader,
+            parsers,
+            lambda x: False,
+            self._inv_projection,
             )
 
 
-def project_parse_fields(record, parsers, is_missing, field_idxs=None):
-    new_record = [None] * len(parsers)
-    for out_idx in range(len(parsers)):
-        # Find the input index corresponding to the output index
-        in_idx = (field_idxs[out_idx]
-                  if field_idxs is not None
-                  else out_idx)
-        # Leave field as None if it doesn't exist in record
-        if in_idx >= len(record):
-            continue
-        field = record[in_idx]
-        # Leave field as None if missing
-        if is_missing(field):
-            continue
-        # Get the parser and parse the field if defined
-        parser = parsers[out_idx]
-        if parser is None:
-            new_record[out_idx] = field
-            continue
-        value, ok = parser(field)
-        if ok:
-            new_record[out_idx] = value
-        else:
-            new_record[out_idx] = field
-    return new_record
+def project_transform_records(
+        records, transformers, is_missing, inv_projection=None):
+    n_fields = len(transformers)
+    for record in records:
+        new_record = [None] * n_fields
+        for out_idx in range(n_fields):
+            # Find the input index corresponding to the output index
+            in_idx = (inv_projection[out_idx]
+                      if inv_projection is not None
+                      else out_idx)
+            # Leave field as None if it doesn't exist in record
+            if in_idx >= len(record):
+                continue
+            field = record[in_idx]
+            # Leave field as None if missing
+            if is_missing(field):
+                continue
+            # Transform the field if defined
+            transformer = transformers[out_idx]
+            if transformer is None:
+                new_record[out_idx] = field
+                continue
+            new_record[out_idx] = transformer(field)
+        yield new_record
 
 
 def parse_literal(text):
@@ -364,3 +404,12 @@ def parse_literal(text):
         return value
     else:
         return text
+
+
+_types2parsers = {
+    bool: lambda text: parse.bool(text, text),
+    int: lambda text: parse.int(text, text),
+    float: lambda text: parse.float(text, text),
+    object: parse_literal,
+    str: None,
+    }

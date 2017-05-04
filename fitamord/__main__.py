@@ -59,9 +59,22 @@ def main(args=None):
         tabular_file.init_from_file()
         # Set up loading transformations (?) # TODO
         # Read delimited file
-        reader = tabular_file.reader() # TODO enable readers to be context manager
+        reader = tabular_file.reader()
+
+        # Can records be interpreted as patient events?
+        header = reader.header
+        if header.has_field('age'):
+            # Guess event is first non-ID, non-age field
+            idxs = (header.index_of('patient_id'),
+                    header.index_of('age'))
+            for idx in range(len(header)):
+                if idx not in idxs:
+                    break
+            event_name = header.name_at(idx)
+            reader = reader.project('patient_id', 'age', event_name)
+
         # Bulk load records from file into table
-        table = db.make_table(table_name, tabular_file.header)
+        table = db.make_table(reader.name, reader.header)
         table.add_all(reader)
         logger.info(
             'Loaded {} records from {} into {}'
