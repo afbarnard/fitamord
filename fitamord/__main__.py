@@ -69,9 +69,41 @@ def main(args=None):
 
     # Above: ahdb.  Below: fitamord.
 
+    # So, the proper way to treat tabular files is as a `Table` and not
+    # as a `RecordStream`.  That is, the table would know some things
+    # about the file (format and header) and basically be implemented in
+    # terms of iterating over records using the `csv` module.  (The only
+    # data structure is the file.)  For this to work somewhat well, the
+    # column types should be something other than `str` and the values
+    # should be parsed according to that type (if possible, otherwise
+    # just return original field text).  In addition to knowing how to
+    # parse each column, the table will need to know what values
+    # represent missing values so they can be parsed as `None`.  This
+    # much will essentially reproduce SQLite behavior in that columns
+    # will have type affinity (the text in their fields can be expected
+    # to parse as the given type) but will actually store any object,
+    # falling back to the raw text as needed.  For efficiency, the table
+    # should push down projection so that it occurs before parsing.  The
+    # record iterator for the table should have a line number attribute
+    # and potentially a source line (text) attribute to facilitate error
+    # handling.
+
+    # include relational rename in projection like in SQL?
+
     # Define events
 
-    # Clean data
+    # Guess at fields that make up an event: first integer field is
+    # patient ID, first float field is time / age, first str field is
+    # event ID.  Or require and use names?
+
+    # Types of tables: demographics, events (drugs, conds, procs,
+    # symptoms), events with values (labs, vitals), labels
+
+    # Recognize study periods by (patient ID, start, stop, dose, label)
+    # format
+
+    # Clean data: drop events without valid patient IDs, event IDs, or
+    # times / ages
 
     # Collect event types
 
