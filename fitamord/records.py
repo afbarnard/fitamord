@@ -149,6 +149,14 @@ class Header(NamedItems):
         # Add `has_index` to superclass implementation
         return self.has_index(obj) or super().__contains__(obj)
 
+    def has_field(self, field):
+        if isinstance(field, Field):
+            field = field.name
+        return self.has_name(field) or self.has_index(field)
+
+    def project(self, *columns):
+        return Header(*(self.field_of(col) for col in columns))
+
 
 class Record:
     pass
