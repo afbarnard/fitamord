@@ -163,10 +163,13 @@ Format.PROGRAMMING_CSV = Format(
 
 class File:
 
+    # TODO sort out header in the file from header object created to interpret file
+
     def __init__(
             self,
             path,
             format=None,
+            file_has_header=False,
             name=None,
             header=None,
             fingerprint=None,
@@ -178,6 +181,7 @@ class File:
                       if name is not None
                       else self._path.name.split('.')[0])
         self._format = format
+        self._file_has_header = file_has_header
         self._header = header
         self._fingerprint = fingerprint
 
@@ -207,6 +211,7 @@ class File:
         return Reader(
             path=self.path,
             format=self.format,
+            file_has_header=self._file_has_header,
             name=self.name,
             header=self.header,
             is_missing=is_missing,
@@ -268,6 +273,7 @@ class File:
                         break
             # Build header
             self._header = records.Header(names=names, types=types)
+            self._file_has_header = has_header
 
     def __eq__(self, other):
         # For comparing Files constructed from configuration to those
@@ -281,6 +287,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
             self,
             path,
             format=None,
+            file_has_header=False, # TODO generalize to skipping a number of rows?
             name=None,
             header=None,
             is_missing=None,
@@ -293,6 +300,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
                       if name is not None
                       else self._path.name.split('.')[0])
         self._format = format
+        self._file_has_header = file_has_header
         self._header = header
         self._is_missing = make_is_missing(is_missing)
         self._inv_projection = None
@@ -358,12 +366,18 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
         parsers = [_types2parsers.get(typ, None)
                    for typ in self.header.types()]
         # Make record processing loop
-        return project_transform_records(
+        loop = project_transform_records(
             csv_reader,
             parsers,
             self._is_missing,
             self._inv_projection,
             )
+        # Skip first record if the file has a header
+        if self._file_has_header:
+            loop = iter(loop)
+            next(loop, None)
+        # Return iterator
+        return loop
 
 
 def make_is_missing(is_missing=None):
