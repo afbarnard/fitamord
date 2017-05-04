@@ -289,7 +289,9 @@ def make_record_transformer(header, transformation):
     return record_transformer
 
 
-def read_delimited_text( # TODO replace with better API as described in 5c17df2d
+# Note: this is just a prototype.  For a proper implementation see
+# `delimited.Reader`.
+def read_delimited_text( # TODO remove; replace with convenience function `delimited.read`?
         # Input
         file,
         compression='auto',
