@@ -7,11 +7,14 @@ otherwise working with tabular data in delimited text files.
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
-
+import collections
 import csv
 import io
+import itertools as itools
 import pathlib
 from enum import Enum
+
+from barnapy import parse
 
 from . import file
 from . import records
@@ -208,23 +211,22 @@ class File:
             record_transformation=record_transformation,
             )
 
-    def init_from_file(self, what='all', sample_size=1048576):
+    def init_from_file(self, what='all', sample_size=1048576): # TODO split into reusable pieces
         # Interpret `what` # TODO
         # Read the first part of the file to use as a sample
         with file.open(self.path, 'rt') as csv_file:
             sample = csv_file.read(sample_size)
-            # Analyze the sample to determine delimiter and header
-            dialect = csv.excel # Default to Excel format
-            has_header = False
-            sniffer = csv.Sniffer()
-            try:
-                dialect = sniffer.sniff(sample)
-                has_header = sniffer.has_header(sample)
-            except:
-                pass
-            csv_file.seek(0)
-            csv_reader = csv.reader(csv_file, dialect=dialect)
-            row = next(csv_reader)
+        # Analyze the sample to determine delimiter and header
+        dialect = csv.excel # Default to Excel format
+        has_header = False
+        sniffer = csv.Sniffer()
+        try:
+            dialect = sniffer.sniff(sample)
+            has_header = sniffer.has_header(sample)
+        except:
+            pass
+        csv_reader = csv.reader(io.StringIO(sample), dialect=dialect)
+        row = next(csv_reader, None)
         # Build format
         if what in ('all', 'format') or 'format' in what:
             self._format = Format(
@@ -238,12 +240,33 @@ class File:
                 skip_blank_lines=True,
                 )
         # Build header
-        if what in ('all', 'header') or 'header' in what:
+        if ((what in ('all', 'header') or 'header' in what)
+                and row is not None):
+            # Get header names from the first row or just use Xs
             if has_header:
                 names = row
             else:
                 names = ['x' + str(i + 1) for i in range(len(row))]
-            self._header = records.Header(names=names)
+            # Guess types by parsing the first non-header rows
+            if has_header:
+                row = next(csv_reader, None)
+            col_types = [
+                collections.Counter((type(parse_literal(field)),))
+                for field in row]
+            for row in itools.islice(csv_reader, 100):
+                for col_idx, col_val in enumerate(row):
+                    col_type = type(parse_literal(col_val))
+                    col_types[col_idx][col_type] += 1
+            # Choose the most common type (except NoneType) as the type.
+            # Default to object.
+            types = [object] * len(col_types)
+            for idx, counter in enumerate(col_types):
+                for col_type, frequency in counter.most_common():
+                    if col_type != type(None):
+                        types[idx] = col_type
+                        break
+            # Build header
+            self._header = records.Header(names=names, types=types)
 
     def __eq__(self, other):
         # For comparing Files constructed from configuration to those
@@ -327,3 +350,17 @@ def project_parse_fields(record, parsers, is_missing, field_idxs=None):
         else:
             new_record[out_idx] = field
     return new_record
+
+
+def parse_literal(text):
+    # Short circuit parsing if not text
+    if not isinstance(text, str):
+        return text
+    # Try to parse as a common type of literal
+    value, ok = parse.literal(text)
+    # If successful, return parsed value, otherwise just return the
+    # original text
+    if ok:
+        return value
+    else:
+        return text
