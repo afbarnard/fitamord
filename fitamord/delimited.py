@@ -203,13 +203,13 @@ class File:
     def header(self):
         return self._header
 
-    def reader(self, record_transformation=None):
+    def reader(self, is_missing=None):
         return Reader(
             path=self.path,
             format=self.format,
             name=self.name,
             header=self.header,
-            record_transformation=record_transformation,
+            is_missing=is_missing,
             )
 
     def init_from_file(self, what='all', sample_size=1048576): # TODO split into reusable pieces
@@ -283,7 +283,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
             format=None,
             name=None,
             header=None,
-            record_transformation=None,
+            is_missing=None,
             error_handler=None,
             ):
         self._path = (path
@@ -294,7 +294,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
                       else self._path.name.split('.')[0])
         self._format = format
         self._header = header
-        self._rec_txform = record_transformation
+        self._is_missing = make_is_missing(is_missing)
         self._inv_projection = None
         super().__init__(
             records=None,
@@ -361,9 +361,22 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
         return project_transform_records(
             csv_reader,
             parsers,
-            lambda x: False,
+            self._is_missing,
             self._inv_projection,
             )
+
+
+def make_is_missing(is_missing=None):
+    def _is_missing(text):
+        if text is None:
+            return True
+        if not isinstance(text, str):
+            return False
+        return (parse.is_none(text)
+                or parse.is_empty(text)
+                or (is_missing is not None
+                    and is_missing(text)))
+    return _is_missing
 
 
 def project_transform_records(

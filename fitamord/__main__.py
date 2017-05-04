@@ -4,6 +4,7 @@
 # under the MIT License.  See `LICENSE.txt` for details.
 
 import os.path
+import re
 import sys
 
 from barnapy import logging
@@ -12,6 +13,12 @@ from barnapy import unixutils
 from . import delimited
 from . import records
 from .engines import sqlite
+
+
+_na_pattern = re.compile(r'\W*not\s*a(?:vail|pplic)able', re.IGNORECASE)
+
+def is_na(text):
+    return _na_pattern.match(text) is not None
 
 
 def main(args=None):
@@ -57,9 +64,8 @@ def main(args=None):
         # Determine file format and table schema
         tabular_file = delimited.File(filename)
         tabular_file.init_from_file()
-        # Set up loading transformations (?) # TODO
         # Read delimited file
-        reader = tabular_file.reader()
+        reader = tabular_file.reader(is_missing=is_na)
 
         # Can records be interpreted as patient events?
         header = reader.header
