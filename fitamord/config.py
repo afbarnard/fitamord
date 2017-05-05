@@ -1,9 +1,13 @@
 """Configuration objects"""
-# Copyright (c) 2016 Aubrey Barnard.  This is free software released
+
+# Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 import collections
-from collections import OrderedDict as ordict
+import datetime
+
+import yaml
+from barnapy import parse
 
 
 # Configuration as state needed to perform a specific execution.
@@ -15,7 +19,8 @@ from collections import OrderedDict as ordict
 
 class Configuration:
 
-    pass
+    def __init__(self, *args, **kwargs):
+        pass
 
 
 default = Configuration([
@@ -65,3 +70,222 @@ default = Configuration([
 # this is all too big for right now; need simplest thing that could work in order to get loading of data running; no configuration at all and just assume parsing and loading of all CSV files?
 
 # work bottom up in order to know what needs to be defined / configured (?)
+
+
+# ===== Forget about all of above for now =====
+
+
+# Make yaml load with ordered dicts because it is important to preserve
+# the order of fields / columns.
+yaml.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    lambda loader, node: collections.OrderedDict(
+        loader.construct_pairs(node)),
+    )
+
+
+def build_list(obj, err_msg=None, *contexts):
+    if obj is None:
+        return None
+    elif isinstance(obj, list):
+        return obj
+    elif isinstance(obj, str):
+        return [s.strip() for s in obj.split(',')]
+    elif isinstance(obj, (int, float)):
+        return [obj]
+    else:
+        if err_msg is None:
+            raise ConfigError('Not an item or list:', obj, *contexts)
+        else:
+            raise ConfigError(
+                'Not an item or list', obj, err_msg, *contexts)
+
+
+class ConfigError(Exception):
+
+    def __init__(self, message, value=None, *contexts):
+        components = [str(c) for c in reversed(contexts)]
+        components.append(str(message))
+        if value is not None:
+            components.append(repr(value))
+        msg = ': '.join(components)
+        super().__init__(msg)
+
+
+class FitamordConfig:
+
+    def __init__(self, dict_, *contexts):
+        if not isinstance(dict_, dict):
+            raise ValueError('Not a dict: {!r}'.format(dict_))
+        self._tables = (
+            self._build_tables(dict_['tables'], 'tables', *contexts)
+            if 'tables' in dict_
+            else None)
+
+    def _build_tables(self, dict_, *contexts):
+        return tuple(TabularFileConfig(k, v, k, *contexts)
+                     for (k, v) in dict_.items())
+
+    @property
+    def tables(self):
+        return self._tables
+
+
+_names2types = {
+    'bool': bool,
+    'boolean': bool,
+    'char': str,
+    'date': datetime.date,
+    'datetime': datetime.datetime,
+    'double': float,
+    'float': float,
+    'int': int,
+    'integer': int,
+    'real': float,
+    'str': str,
+    'string': str,
+    'time': datetime.time,
+    'varchar': str,
+    }
+
+
+class TabularFileConfig:
+
+    _treatments = {'events', 'examples', 'features'}
+
+    def __init__(self, name, dict_=None, *contexts):
+        self._name = name
+        self._dict = dict_ if isinstance(dict_, dict) else {}
+        self._filename = self._dict.get('file', None)
+        self._cols = self._build_column_defs(
+            self._dict.get('columns', None), 'columns', *contexts)
+        self._use_cols = self._build_column_refs(
+            self._dict.get('use', None), 'use', *contexts)
+        self._id_cols = self._build_column_refs(
+            self._dict.get('id', None), 'id', *contexts)
+        treat_as = self._dict.get('treat as', None)
+        if treat_as is not None and treat_as not in self._treatments:
+            raise ConfigError(
+                'Unrecognized treatment', treat_as,
+                'treat as', *contexts)
+        self._treat_as = treat_as
+
+    def _build_column_defs(self, cols, *contexts):
+        if cols is None:
+            return None
+        elif isinstance(cols, int):
+            return tuple((i, None, None) for i in range(cols))
+        elif isinstance(cols, dict):
+            col_defs = []
+            col_idx = 0
+            for key, val in cols.items():
+                col_name = None
+                col_type = None
+                if isinstance(key, int):
+                    col_idx = key - 1
+                    words = build_list(
+                        val, 'Bad column definition', key, *contexts)
+                    if words is not None:
+                        if len(words) >= 1:
+                            col_name = words[0]
+                        if len(words) >= 2:
+                            col_type = words[1]
+                elif isinstance(key, str):
+                    col_name = key
+                    col_type = val
+                else:
+                    raise ConfigError(
+                        'Not a column reference', key, *contexts)
+                # Validate and interpret type name
+                if col_type is not None:
+                    if not isinstance(col_type, str):
+                        raise ConfigError(
+                            'Not a type name', col_type, key, *contexts)
+                    if col_type not in _names2types:
+                        raise ConfigError(
+                            'Unrecognized type', col_type, key, *contexts)
+                col_type = _names2types.get(col_type, None)
+                col_defs.append((col_idx, col_name, col_type))
+                col_idx += 1
+            return tuple(col_defs)
+        elif isinstance(cols, list):
+            col_defs = []
+            col_idx = 0
+            for col in cols:
+                if isinstance(col, int):
+                    col_idx = col - 1
+                    col_defs.append((col_idx, None, None))
+                elif isinstance(col, str):
+                    col_defs.append((None, col, None))
+                else:
+                    raise ConfigError(
+                        'Not a column reference', col, *contexts)
+                col_idx += 1
+            return tuple(col_defs)
+        else:
+            raise ConfigError('Unrecognized definition', cols, *contexts)
+
+    def _build_column_refs(self, cols, *contexts):
+        refs = None
+        if cols is None:
+            return None
+        elif isinstance(cols, int):
+            refs = list(range(1, cols + 1))
+        elif isinstance(cols, str):
+            refs = [parse.int(x, x)
+                    for x in build_list(cols, *contexts)]
+        elif isinstance(cols, list):
+            refs = cols
+        else:
+            raise ConfigError(
+                'Unrecognized definition', cols, *contexts)
+        # Interpret and validate columns
+        columns = self.columns
+        if columns is None:
+            columns = ()
+        col_names = set(col[1] for col in columns if col[1] is not None)
+        for idx, ref in enumerate(refs):
+            if isinstance(ref, int):
+                # Assume index is valid.  Just convert it from 1-based
+                # to 0-based.
+                refs[idx] -= 1
+            elif isinstance(ref, str):
+                if ref not in col_names:
+                    raise ConfigError(
+                        'Column not found', ref, *contexts)
+            else:
+                raise ConfigError(
+                    'Not a column reference', ref, *contexts)
+        return tuple(refs)
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def filename(self):
+        return (self._filename
+                if self._filename is not None
+                else self.name + '.csv')
+
+    @property
+    def format(self):
+        return self._dict.get('format', None)
+
+    @property
+    def columns(self):
+        return self._cols
+
+    @property
+    def id_columns(self):
+        return self._id_cols if self._id_cols is not None else (0,)
+
+    @property
+    def use_columns(self):
+        return self._use_cols
+
+    @property
+    def treat_as(self):
+        return (self._treat_as
+                if self._treat_as is not None
+                else 'events')
