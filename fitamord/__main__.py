@@ -54,7 +54,7 @@ def main(args=None):
     assert filenames # what is appropriate error, if any?
 
     # Connect to DB
-    db_filename = '.fitamord.sqlite'
+    db_filename = os.path.join(base_directory, '.fitamord.sqlite')
     db = sqlite.SqliteDb(db_filename) # TODO separate establishing connection from construction to enable context manager
 
     # Load tabular files into DB
