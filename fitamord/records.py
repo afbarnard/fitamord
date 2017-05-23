@@ -3,6 +3,7 @@
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
+import collections
 import itertools as itools
 
 from . import general
@@ -55,12 +56,16 @@ class Field:
     def type(self):
         return self._type
 
+    @property
+    def typename(self):
+        return self.type.__name__
+
     def isinstance(self, obj):
         return isinstance(obj, self._type)
 
     def __repr__(self):
         return '{}(name={!r}, typ={})'.format(
-            general.fq_typename(self), self.name, self.type.__name__)
+            general.fq_typename(self), self.name, self.typename)
 
     def __eq__(self, other):
         return (type(self) == type(other)
@@ -156,6 +161,10 @@ class Header(NamedItems):
 
     def project(self, *columns):
         return Header(*(self.field_of(col) for col in columns))
+
+    def as_yaml_object(self):
+        return collections.OrderedDict(
+            (f.name, f.typename) for f in self.fields())
 
 
 class Record:

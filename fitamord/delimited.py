@@ -18,6 +18,7 @@ from enum import Enum
 from barnapy import parse
 
 from . import file
+from . import general
 from . import records
 
 
@@ -92,26 +93,27 @@ class Format:
     def skip_blank_lines(self):
         return self._skip_blank_lines
 
-    def items(self):
-        """Return fields as an iterable of (name, value) pairs."""
-        yield 'comment_char', self._comment_char
-        yield 'delimiter', self._delimiter
-        yield 'quote_char', self._quote_char
-        yield 'escape_char', self._escape_char
-        yield 'escape_style', self._escape_style
-        yield 'skip_blank_lines', self._skip_blank_lines
+    def as_dict(self):
+        return collections.OrderedDict((
+            ('comment_char', self._comment_char),
+            ('delimiter', self._delimiter),
+            ('quote_char', self._quote_char),
+            ('escape_char', self._escape_char),
+            ('escape_style', self._escape_style),
+            ('skip_blank_lines', self._skip_blank_lines),
+            ))
+
+    def as_yaml_object(self):
+        _dict = self.as_dict()
+        # Replace non-YAML values with strings
+        _dict['escape_style'] = _dict['escape_style'].name
+        return _dict
 
     def __repr__(self):
-        buffer = io.StringIO()
-        buffer.write('Format(')
-        for idx, (name, value) in enumerate(self.items()):
-            if idx > 0:
-                buffer.write(', ')
-            buffer.write(name)
-            buffer.write('=')
-            buffer.write(repr(value))
-        buffer.write(')')
-        return buffer.getvalue()
+        fields = []
+        for name, value in self.as_dict().items():
+            fields.append('{}={!r}'.format(name, value))
+        return '{}({})'.format(general.fq_typename(self), ', '.join(fields))
 
     def is_valid(self):
         """Whether this Format is fully specified enough for parsing."""
@@ -128,7 +130,7 @@ class Format:
         arguments are valid here.
 
         """
-        new_fields = dict(self.items())
+        new_fields = self.as_dict()
         new_fields.update(kwargs)
         return Format(**new_fields)
 
@@ -306,9 +308,9 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
         self._inv_projection = None
         super().__init__(
             records=None,
-            name=self.name,
-            header=self.header,
-            provenance=self.path,
+            name=self._name,
+            header=self._header,
+            provenance=self._path,
             error_handler=error_handler,
             is_reiterable=True,
             )
