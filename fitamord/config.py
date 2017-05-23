@@ -7,7 +7,12 @@ import collections
 import datetime
 
 import yaml
+from barnapy import files
+from barnapy import logging
 from barnapy import parse
+from barnapy import unixutils
+
+from . import delimited
 
 
 # Configuration as state needed to perform a specific execution.
@@ -84,6 +89,77 @@ yaml.add_constructor(
     )
 
 
+# Write out ordered dicts as regular dicts
+yaml.add_representer(
+    collections.OrderedDict,
+    lambda dumper, data: yaml.nodes.MappingNode(
+        'tag:yaml.org,2002:map',
+        [(dumper.represent_data(key), dumper.represent_data(val))
+         for (key, val) in data.items()]),
+    )
+
+
+def load(file):
+    _file = files.new(file)
+    with _file.open('rt') as yaml_file:
+        yaml_tree = yaml.load(yaml_file)
+    return FitamordConfig(yaml_tree, _file.name)
+
+
+def save(config_obj, file):
+    if isinstance(config_obj, FitamordConfig):
+        config_obj = config_obj.as_yaml_object()
+    file = files.new(file)
+    with file.open('wt') as yaml_file:
+        yaml.dump(config_obj,
+                  yaml_file,
+                  version=(1, 2),
+                  explicit_start=True,
+                  explicit_end=True,
+                  default_flow_style=False,
+                  )
+
+
+def detect(directory, extensions):
+    logger = logging.getLogger(__name__)
+    # List the directory
+    dirnames, filenames = unixutils.ls(directory)
+    filenames = sorted(filenames)
+    # Search for tabular files
+    patterns = ['*' + e for e in extensions]
+    tabular_files = unixutils.glob(
+        filenames, *patterns, case_sensitive=False)
+    # Detect formats and headers of tabular files
+    tables = collections.OrderedDict()
+    for filename in tabular_files:
+        file = files.File(directory, filename)
+        logger.info('Detecting format and columns of: {}', file)
+        # Determine file format and table schema
+        tabular_file = delimited.File(file.path)
+        tabular_file.init_from_file()
+        # Build configuration for table
+        table_cfg = collections.OrderedDict()
+        table_cfg['file'] = filename
+        table_cfg['format'] = (
+            collections.OrderedDict(
+                tabular_file.format.as_yaml_object())
+            if tabular_file.format
+            else None)
+        table_cfg['columns'] = (
+            collections.OrderedDict(
+                tabular_file.header.as_yaml_object())
+            if tabular_file.header
+            else None)
+        table_cfg['id'] = None
+        table_cfg['use'] = None
+        table_cfg['treat as'] = None
+        tables[file.stem] = table_cfg
+    # Build configuration
+    cfg = collections.OrderedDict()
+    cfg['tables'] = tables
+    return FitamordConfig(cfg, '<config detection>')
+
+
 def build_list(obj, err_msg=None, *contexts):
     if obj is None:
         return None
@@ -117,6 +193,7 @@ class FitamordConfig:
     def __init__(self, dict_, *contexts):
         if not isinstance(dict_, dict):
             raise ValueError('Not a dict: {!r}'.format(dict_))
+        self._dict = dict_
         self._tables = (
             self._build_tables(dict_['tables'], 'tables', *contexts)
             if 'tables' in dict_
@@ -129,6 +206,11 @@ class FitamordConfig:
     @property
     def tables(self):
         return self._tables
+
+    def as_dict(self):
+        return self._dict
+
+    as_yaml_object = as_dict
 
 
 _names2types = {

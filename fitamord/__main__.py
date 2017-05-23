@@ -3,13 +3,15 @@
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
-import os.path
+import itertools as itools
 import re
 import sys
 
+from barnapy import files
 from barnapy import logging
 from barnapy import unixutils
 
+from . import config
 from . import delimited
 from . import records
 from .engines import sqlite
@@ -21,23 +23,57 @@ def is_na(text):
     return _na_pattern.match(text) is not None
 
 
+def extension_combinations(extensions, *extension_collections):
+    ext_colls = [sorted(extensions)]
+    ext_colls += [[None] + sorted(ec) for ec in extension_collections]
+    for tup in itools.product(('',), *ext_colls):
+        yield '.'.join(str(e) for e in tup if e is not None)
+
+
 def main(args=None):
     # Default args to sys.argv
     if args is None:
         args = sys.argv[1:]
     base_directory = (args[0] if args else '.')
 
+    # Definitions which should be configurable
+    tabular_extensions = {'csv'}
+    compression_extensions = {'gz', 'bz2', 'xz'}
+    config_filename = 'fitamord_config.yaml'
+    generated_config_filename = 'fitamord_config.generated.yaml'
+    db_filename = 'fitamord.sqlite'
+
     # Start logging
     logging.default_config()
     logger = logging.getLogger('main')
 
     # Read config, process command line, create environment
+    config_file = files.File(base_directory, config_filename)
+    if config_file.is_readable_file():
+        # Load configuration
+        logger.info('Loading configuration from: {}', config_file)
+        config_obj = config.load(config_file)
+    else:
+        # Guess configuration
+        ext_combs = list(extension_combinations(
+            tabular_extensions, compression_extensions))
+        logger.info(
+            'No configuration file specified: '
+            'Detecting configuration from files matching: {}/*{{{}}}',
+            base_directory,
+            ','.join(ext_combs))
+        config_obj = config.detect(base_directory, ext_combs)
 
-    # Write assembled config (as "shadow")
+    # Write config
+    gen_config_file = files.File(
+        base_directory, generated_config_filename)
+    logger.info('Writing configuration to: {}', gen_config_file)
+    config.save(config_obj, gen_config_file)
+
+    # Quit here for now until below is revised # FIXME
+    return
 
     # Search for tabular files
-    compression_extensions = {'gz', 'bz2', 'xz'}
-    tabular_extensions = {'csv'}
     filenames = []
     for filename in unixutils.ls(base_directory)[1]:
         relative_filename = os.path.join(base_directory, filename)
@@ -54,8 +90,8 @@ def main(args=None):
     assert filenames # what is appropriate error, if any?
 
     # Connect to DB
-    db_filename = os.path.join(base_directory, '.fitamord.sqlite')
-    db = sqlite.SqliteDb(db_filename) # TODO separate establishing connection from construction to enable context manager
+    db_file = files.File(base_directory, db_filename)
+    db = sqlite.SqliteDb(db_file.path) # TODO separate establishing connection from construction to enable context manager
 
     # Load tabular files into DB
     for filename in filenames:
