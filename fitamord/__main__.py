@@ -4,23 +4,23 @@
 # under the MIT License.  See `LICENSE.txt` for details.
 
 import itertools as itools
-import re
 import sys
 
 from barnapy import files
 from barnapy import logging
-from barnapy import unixutils
 
 from . import config
 from . import delimited
-from . import records
 from .engines import sqlite
 
 
-_na_pattern = re.compile(r'\W*not\s*a(?:vail|pplic)able', re.IGNORECASE)
-
-def is_na(text):
-    return _na_pattern.match(text) is not None
+def make_is_missing(missing_values):
+    missing_strs = {
+        (str(val).strip().lower() if val is not None else None)
+        for val in missing_values}
+    def is_missing(text):
+        return text.strip().lower() in missing_strs
+    return is_missing
 
 
 def extension_combinations(extensions, *extension_collections):
@@ -78,7 +78,12 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Write config
     gen_config_file = base_directory.join(generated_config_filename)
     logger.info('Writing configuration to: {}', gen_config_file)
-    config.save(config_obj, gen_config_file)
+    config.save(config_obj, gen_config_file, insert_defaults=True)
+
+    # Create function for recognizing missing values
+    is_missing = (make_is_missing(config_obj.is_missing)
+                  if config_obj.is_missing
+                  else None)
 
     # Connect to DB
     db_file = base_directory.join(db_filename)
@@ -108,9 +113,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
                     'Format or header detection failed: {}',
                     table_file)
                 continue
-        is_missing = lambda: False # FIXME
         # Read delimited file
-        reader = tabular_file.reader()
+        reader = tabular_file.reader(is_missing)
         # Project
         if table.use_columns:
             reader = reader.project(*table.use_columns)

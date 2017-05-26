@@ -396,19 +396,6 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
         return loop
 
 
-#def make_is_missing(is_missing=None):
-#    def _is_missing(text):
-#        if text is None:
-#            return True
-#        if not isinstance(text, str):
-#            return False
-#        return (parse.is_none(text)
-#                or parse.is_empty(text)
-#                or (is_missing is not None
-#                    and is_missing(text)))
-#    return _is_missing
-
-
 def project_transform_records(
         records, transformers, is_missing=None, inv_projection=None):
     n_fields = len(transformers)

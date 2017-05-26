@@ -104,12 +104,12 @@ def load(file):
     file = files.new(file)
     with file.open('rt') as yaml_file:
         yaml_tree = yaml.load(yaml_file)
-    return FitamordConfig(yaml_tree, file.name)
+    return FitamordConfig(yaml_tree, file.path)
 
 
-def save(config_obj, file):
+def save(config_obj, file, insert_defaults=False):
     if isinstance(config_obj, FitamordConfig):
-        config_obj = config_obj.as_yaml_object()
+        config_obj = config_obj.as_yaml_object(insert_defaults)
     file = files.new(file)
     with file.open('wt') as yaml_file:
         yaml.dump(config_obj,
@@ -195,6 +195,8 @@ class ConfigError(Exception):
 
 class FitamordConfig:
 
+    default_is_missing = ['', '?', 'na', 'nil', 'none', 'null']
+
     def __init__(self, dict_, *contexts):
         if not dict_:
             raise ConfigError('Empty configuration', dict_, *contexts)
@@ -202,14 +204,39 @@ class FitamordConfig:
             raise ConfigError(
                 'Configuration not a dictionary', dict_, *contexts)
         self._dict = dict_
+        self._is_missing = (
+            self._build_is_missing(
+                dict_['is_missing'], 'is_missing', *contexts)
+            if 'is_missing' in dict_
+            else None)
         self._tables = (
             self._build_tables(dict_['tables'], 'tables', *contexts)
             if 'tables' in dict_
             else None)
 
+    def _build_is_missing(self, obj, *contexts):
+        if obj is None:
+            return []
+        elif obj == 'default':
+            return self.default_is_missing
+        elif isinstance(obj, str):
+            return [obj]
+        elif isinstance(obj, list):
+            return [(str(o) if o is not None else None) for o in obj]
+        else:
+            raise ConfigError(
+                'Not a list of strings that indicate missing',
+                obj, *contexts)
+
     def _build_tables(self, dict_, *contexts):
         return tuple(TabularFileConfig(k, v, k, *contexts)
                      for (k, v) in dict_.items())
+
+    @property
+    def is_missing(self):
+        if self._is_missing is None:
+            return self.default_is_missing
+        return self._is_missing
 
     @property
     def tables(self):
@@ -218,7 +245,16 @@ class FitamordConfig:
     def as_dict(self):
         return self._dict
 
-    as_yaml_object = as_dict
+    def as_yaml_object(self, insert_defaults=False):
+        if insert_defaults:
+            dict_ = dict(self._dict)
+            if 'is_missing' not in dict_:
+                dict_['is_missing'] = self.default_is_missing
+            if 'tables' not in dict_:
+                dict_['tables'] = None
+            return dict_
+        else:
+            return self._dict
 
 
 _names2types = {
