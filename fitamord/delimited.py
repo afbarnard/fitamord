@@ -12,9 +12,10 @@ import copy
 import csv
 import io
 import itertools as itools
-import pathlib
 from enum import Enum
 
+from barnapy import files
+from barnapy import logging
 from barnapy import parse
 
 from . import file
@@ -39,6 +40,7 @@ class Format:
             escape_char=None,
             escape_style=None,
             skip_blank_lines=None,
+            data_start_line=None,
             ):
         """Create a new delimited text file format.
 
@@ -57,6 +59,10 @@ class Format:
         skip_blank_lines: Whether blank lines are considered records or
             not.
 
+        data_start_line: Number of the non-comment line where the data
+            starts.  For example, if the file has a header row, this
+            should be 2.  The default is 1.
+
         """
         self._comment_char = comment_char
         self._delimiter = delimiter
@@ -68,6 +74,14 @@ class Format:
                                   or escape_style is None)
                               else EscapeStyle[escape_style])
         self._skip_blank_lines = skip_blank_lines
+        # Validate data_start_line
+        if not (data_start_line is None
+                or (isinstance(data_start_line, int)
+                    and data_start_line >= 1)):
+            raise ValueError(
+                'data_start_line: Not an integer >= 1: {}'
+                .format(data_start_line))
+        self._data_start_line = data_start_line
 
     @property
     def comment_char(self):
@@ -93,6 +107,12 @@ class Format:
     def skip_blank_lines(self):
         return self._skip_blank_lines
 
+    @property
+    def data_start_line(self):
+        return (self._data_start_line
+                if self._data_start_line is not None
+                else 1)
+
     def as_dict(self):
         return collections.OrderedDict((
             ('comment_char', self._comment_char),
@@ -101,6 +121,7 @@ class Format:
             ('escape_char', self._escape_char),
             ('escape_style', self._escape_style),
             ('skip_blank_lines', self._skip_blank_lines),
+            ('data_start_line', self._data_start_line),
             ))
 
     def as_yaml_object(self):
@@ -171,19 +192,13 @@ class File:
             self,
             path,
             format=None,
-            file_has_header=False,
             name=None,
             header=None,
             fingerprint=None,
             ):
-        self._path = (path
-                      if isinstance(path, pathlib.Path)
-                      else pathlib.Path(path))
-        self._name = (name
-                      if name is not None
-                      else self._path.name.split('.')[0])
+        self._path = files.new(path)
+        self._name = name if name is not None else self._path.stem
         self._format = format
-        self._file_has_header = file_has_header
         self._header = header
         self._fingerprint = fingerprint
 
@@ -213,16 +228,17 @@ class File:
         return Reader(
             path=self.path,
             format=self.format,
-            file_has_header=self._file_has_header,
             name=self.name,
             header=self.header,
             is_missing=is_missing,
             )
 
     def init_from_file(self, what='all', sample_size=1048576): # TODO split into reusable pieces
+        logger = logging.getLogger(general.fq_typename(self))
+        logger.info('Detecting format and header of: {}', self.path)
         # Interpret `what` # TODO
         # Read the first part of the file to use as a sample
-        with file.open(self.path, 'rt') as csv_file:
+        with self.path.open('rt') as csv_file:
             sample = csv_file.read(sample_size)
         # Analyze the sample to determine delimiter and header
         dialect = csv.excel # Default to Excel format
@@ -246,6 +262,7 @@ class File:
                               if dialect.doublequote
                               else EscapeStyle.escaping),
                 skip_blank_lines=True,
+                data_start_line=(2 if has_header else None),
                 )
         # Build header
         if ((what in ('all', 'header') or 'header' in what)
@@ -275,12 +292,14 @@ class File:
                         break
             # Build header
             self._header = records.Header(names=names, types=types)
-            self._file_has_header = has_header
 
     def __eq__(self, other):
         # For comparing Files constructed from configuration to those
         # constructed from the file content
         pass
+
+    def __str__(self):
+        return str(self._path)
 
 
 class Reader(records.RecordStream): # TODO enable to be context manager?
@@ -289,22 +308,16 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
             self,
             path,
             format=None,
-            file_has_header=False, # TODO generalize to skipping a number of rows?
             name=None,
             header=None,
             is_missing=None,
             error_handler=None,
             ):
-        self._path = (path
-                      if isinstance(path, pathlib.Path)
-                      else pathlib.Path(path))
-        self._name = (name
-                      if name is not None
-                      else self._path.name.split('.')[0])
+        self._path = files.new(path)
+        self._name = name if name is not None else self._path.stem
         self._format = format
-        self._file_has_header = file_has_header
         self._header = header
-        self._is_missing = make_is_missing(is_missing)
+        self._is_missing = is_missing
         self._inv_projection = None
         super().__init__(
             records=None,
@@ -350,7 +363,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
                 'Cannot read file using invalid format: None')
         # Create reader for content
         reader = file.ContentReader(
-            self.path,
+            str(self.path),
             comment_char=self._format.comment_char,
             skip_blank_lines=self._format.skip_blank_lines,
             )
@@ -374,29 +387,30 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
             self._is_missing,
             self._inv_projection,
             )
-        # Skip first record if the file has a header
-        if self._file_has_header:
+        # Skip to the first data record (to avoid the file header)
+        if self._format.data_start_line:
             loop = iter(loop)
-            next(loop, None)
+            for line_num in range(self._format.data_start_line - 1):
+                next(loop, None)
         # Return iterator
         return loop
 
 
-def make_is_missing(is_missing=None):
-    def _is_missing(text):
-        if text is None:
-            return True
-        if not isinstance(text, str):
-            return False
-        return (parse.is_none(text)
-                or parse.is_empty(text)
-                or (is_missing is not None
-                    and is_missing(text)))
-    return _is_missing
+#def make_is_missing(is_missing=None):
+#    def _is_missing(text):
+#        if text is None:
+#            return True
+#        if not isinstance(text, str):
+#            return False
+#        return (parse.is_none(text)
+#                or parse.is_empty(text)
+#                or (is_missing is not None
+#                    and is_missing(text)))
+#    return _is_missing
 
 
 def project_transform_records(
-        records, transformers, is_missing, inv_projection=None):
+        records, transformers, is_missing=None, inv_projection=None):
     n_fields = len(transformers)
     for record in records:
         new_record = [None] * n_fields
@@ -410,7 +424,7 @@ def project_transform_records(
                 continue
             field = record[in_idx]
             # Leave field as None if missing
-            if is_missing(field):
+            if is_missing is not None and is_missing(field):
                 continue
             # Transform the field if defined
             transformer = transformers[out_idx]

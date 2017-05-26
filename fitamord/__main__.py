@@ -30,11 +30,11 @@ def extension_combinations(extensions, *extension_collections):
         yield '.'.join(str(e) for e in tup if e is not None)
 
 
-def main(args=None):
+def main(args=None): # TODO split into outer main that catches and logs exceptions and inner main that raises exceptions
     # Default args to sys.argv
     if args is None:
         args = sys.argv[1:]
-    base_directory = (args[0] if args else '.')
+    base_directory = files.File(args[0] if args else '.')
 
     # Definitions which should be configurable
     tabular_extensions = {'csv'}
@@ -47,12 +47,20 @@ def main(args=None):
     logging.default_config()
     logger = logging.getLogger('main')
 
-    # Read config, process command line, create environment
-    config_file = files.File(base_directory, config_filename)
+    # Check base directory exists
+    if not base_directory.is_readable_directory():
+        logger.error('Not a readable directory: {}', base_directory)
+        return
+
+    # Read config # TODO process command line, create environment
+    config_file = base_directory.join(config_filename)
     if config_file.is_readable_file():
         # Load configuration
         logger.info('Loading configuration from: {}', config_file)
         config_obj = config.load(config_file)
+        if not config_obj.tables:
+            logger.error('No tables defined in: {}', config_file)
+            return
     else:
         # Guess configuration
         ext_combs = list(extension_combinations(
@@ -63,64 +71,59 @@ def main(args=None):
             base_directory,
             ','.join(ext_combs))
         config_obj = config.detect(base_directory, ext_combs)
+        if not config_obj.tables:
+            logger.error('No tables detected in: {}', base_directory)
+            return
 
     # Write config
-    gen_config_file = files.File(
-        base_directory, generated_config_filename)
+    gen_config_file = base_directory.join(generated_config_filename)
     logger.info('Writing configuration to: {}', gen_config_file)
     config.save(config_obj, gen_config_file)
 
-    # Quit here for now until below is revised # FIXME
-    return
-
-    # Search for tabular files
-    filenames = []
-    for filename in unixutils.ls(base_directory)[1]:
-        relative_filename = os.path.join(base_directory, filename)
-        # TODO replace following with `looks_like_tabular_file`
-        components = [piece.lower() for piece in filename.split('.')]
-        if (components[0] != ''
-                and ((len(components) > 1
-                      and components[-1] in tabular_extensions)
-                     or (len(components) > 2
-                         and components[-2] in tabular_extensions
-                         and components[-1] in compression_extensions))
-                and os.path.isfile(relative_filename)):
-            filenames.append(relative_filename)
-    assert filenames # what is appropriate error, if any?
-
     # Connect to DB
-    db_file = files.File(base_directory, db_filename)
+    db_file = base_directory.join(db_filename)
     db = sqlite.SqliteDb(db_file.path) # TODO separate establishing connection from construction to enable context manager
 
     # Load tabular files into DB
-    for filename in filenames:
-        # Table name
-        table_name = os.path.basename(filename).split('.')[0]
-        # Determine file format and table schema
-        tabular_file = delimited.File(filename)
-        tabular_file.init_from_file()
+    for table in config_obj.tables:
+        # Check if file exists
+        table_file = base_directory.join(table.filename)
+        if not table_file.is_readable_file():
+            logger.error(
+                'Loading failed: Not a readable file: {}', table_file)
+            continue
+        # Set up for reading
+        tabular_file = delimited.File(
+            path=table_file,
+            format=table.format,
+            name=table.name,
+            header=table.header,
+            )
+        # Detect format and header if needed # TODO replace with reusable per-file config detection
+        if tabular_file.format is None or tabular_file.header is None:
+            tabular_file.init_from_file()
+            if tabular_file.format is None or tabular_file.header is None:
+                logger.error(
+                    'Loading failed: '
+                    'Format or header detection failed: {}',
+                    table_file)
+                continue
+        is_missing = lambda: False # FIXME
         # Read delimited file
-        reader = tabular_file.reader(is_missing=is_na)
-
-        # Can records be interpreted as patient events?
-        header = reader.header
-        if header.has_field('age'):
-            # Guess event is first non-ID, non-age field
-            idxs = (header.index_of('patient_id'),
-                    header.index_of('age'))
-            for idx in range(len(header)):
-                if idx not in idxs:
-                    break
-            event_name = header.name_at(idx)
-            reader = reader.project('patient_id', 'age', event_name)
-
+        reader = tabular_file.reader()
+        # Project
+        if table.use_columns:
+            reader = reader.project(*table.use_columns)
+        elif table.treat_as == 'events' and len(reader.header) > 3:
+            reader = reader.project(*range(3))
+        elif table.treat_as == 'examples' and len(reader.header) > 4:
+            reader = reader.project(*range(4))
         # Bulk load records from file into table
         table = db.make_table(reader.name, reader.header)
         table.add_all(reader)
         logger.info(
             'Loaded {} records from {} into {}'
-            .format(table.count_rows(), filename, table.name))
+            .format(table.count_rows(), table_file.path, table.name))
 
     # Above: ahdb.  Below: fitamord.
 

@@ -13,6 +13,7 @@ from barnapy import parse
 from barnapy import unixutils
 
 from . import delimited
+from . import records
 
 
 # Configuration as state needed to perform a specific execution.
@@ -100,10 +101,10 @@ yaml.add_representer(
 
 
 def load(file):
-    _file = files.new(file)
-    with _file.open('rt') as yaml_file:
+    file = files.new(file)
+    with file.open('rt') as yaml_file:
         yaml_tree = yaml.load(yaml_file)
-    return FitamordConfig(yaml_tree, _file.name)
+    return FitamordConfig(yaml_tree, file.name)
 
 
 def save(config_obj, file):
@@ -120,10 +121,11 @@ def save(config_obj, file):
                   )
 
 
-def detect(directory, extensions):
+def detect(directory, extensions): # TODO make reusable per-file config detection
     logger = logging.getLogger(__name__)
     # List the directory
-    dirnames, filenames = unixutils.ls(directory)
+    directory = files.new(directory)
+    dirnames, filenames = unixutils.ls(directory.path)
     filenames = sorted(filenames)
     # Search for tabular files
     patterns = ['*' + e for e in extensions]
@@ -132,11 +134,14 @@ def detect(directory, extensions):
     # Detect formats and headers of tabular files
     tables = collections.OrderedDict()
     for filename in tabular_files:
-        file = files.File(directory, filename)
-        logger.info('Detecting format and columns of: {}', file)
+        file = directory.join(filename)
         # Determine file format and table schema
         tabular_file = delimited.File(file.path)
         tabular_file.init_from_file()
+        if tabular_file.format is None or tabular_file.header is None:
+            logger.error(
+                'Format or header detection failed: {}', tabular_file)
+            continue
         # Build configuration for table
         table_cfg = collections.OrderedDict()
         table_cfg['file'] = filename
@@ -171,7 +176,7 @@ def build_list(obj, err_msg=None, *contexts):
         return [obj]
     else:
         if err_msg is None:
-            raise ConfigError('Not an item or list:', obj, *contexts)
+            raise ConfigError('Not an item or list', obj, *contexts)
         else:
             raise ConfigError(
                 'Not an item or list', obj, err_msg, *contexts)
@@ -191,8 +196,11 @@ class ConfigError(Exception):
 class FitamordConfig:
 
     def __init__(self, dict_, *contexts):
-        if not isinstance(dict_, dict):
-            raise ValueError('Not a dict: {!r}'.format(dict_))
+        if not dict_:
+            raise ConfigError('Empty configuration', dict_, *contexts)
+        elif not isinstance(dict_, dict):
+            raise ConfigError(
+                'Configuration not a dictionary', dict_, *contexts)
         self._dict = dict_
         self._tables = (
             self._build_tables(dict_['tables'], 'tables', *contexts)
@@ -239,6 +247,8 @@ class TabularFileConfig:
         self._name = name
         self._dict = dict_ if isinstance(dict_, dict) else {}
         self._filename = self._dict.get('file', None)
+        self._format = self._build_format(
+            self._dict.get('format', None), 'format', *contexts)
         self._cols = self._build_column_defs(
             self._dict.get('columns', None), 'columns', *contexts)
         self._use_cols = self._build_column_refs(
@@ -251,6 +261,25 @@ class TabularFileConfig:
                 'Unrecognized treatment', treat_as,
                 'treat as', *contexts)
         self._treat_as = treat_as
+        self._header = None
+
+    def _build_format(self, fmt_def, *contexts):
+        if fmt_def is None or fmt_def == 'detect':
+            return None
+        elif isinstance(fmt_def, str):
+            # Look up format by name # TODO
+            raise ConfigError(
+                'Format lookup by name not implemented',
+                fmt_def, *contexts)
+        elif isinstance(fmt_def, dict):
+            try:
+                return delimited.Format(**fmt_def)
+            except TypeError as e:
+                raise ConfigError(
+                    'Bad format definition', fmt_def, *contexts) from e
+        else:
+            raise ConfigError(
+                'Unrecognized format definition', fmt_def, *contexts)
 
     def _build_column_defs(self, cols, *contexts):
         if cols is None:
@@ -352,11 +381,18 @@ class TabularFileConfig:
 
     @property
     def format(self):
-        return self._dict.get('format', None)
+        return self._format
 
     @property
     def columns(self):
         return self._cols
+
+    @property
+    def header(self):
+        if self._header is None and self._cols is not None:
+            self._header = records.Header(
+                *((name, typ) for (idx, name, typ) in self.columns))
+        return self._header
 
     @property
     def id_columns(self):
