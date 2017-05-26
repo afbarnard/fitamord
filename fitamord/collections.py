@@ -57,6 +57,8 @@ class NamedItems:
         return self._items[self._names2idxs[name]]
 
     def index_of(self, name):
+        if isinstance(name, int):
+            return name
         return self._names2idxs[name]
 
     def __len__(self):

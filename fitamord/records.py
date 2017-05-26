@@ -160,7 +160,7 @@ class Header(NamedItems):
         return self.has_name(field) or self.has_index(field)
 
     def project(self, *columns):
-        return Header(*(self.field_of(col) for col in columns))
+        return Header(*(self[col] for col in columns))
 
     def as_yaml_object(self):
         return collections.OrderedDict(
