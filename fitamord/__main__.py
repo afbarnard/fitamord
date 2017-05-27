@@ -90,9 +90,9 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     db = sqlite.SqliteDb(db_file.path) # TODO separate establishing connection from construction to enable context manager
 
     # Load tabular files into DB
-    for table in config_obj.tables:
+    for table_cfg in config_obj.tables:
         # Check if file exists
-        table_file = base_directory.join(table.filename)
+        table_file = base_directory.join(table_cfg.filename)
         if not table_file.is_readable_file():
             logger.error(
                 'Loading failed: Not a readable file: {}', table_file)
@@ -100,14 +100,15 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         # Set up for reading
         tabular_file = delimited.File(
             path=table_file,
-            format=table.format,
-            name=table.name,
-            header=table.header,
+            format=table_cfg.format,
+            name=table_cfg.name,
+            header=table_cfg.header,
             )
         # Detect format and header if needed # TODO replace with reusable per-file config detection
         if tabular_file.format is None or tabular_file.header is None:
             tabular_file.init_from_file()
-            if tabular_file.format is None or tabular_file.header is None:
+            if (tabular_file.format is None
+                    or tabular_file.header is None):
                 logger.error(
                     'Loading failed: '
                     'Format or header detection failed: {}',
@@ -115,12 +116,13 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
                 continue
         # Read delimited file
         reader = tabular_file.reader(is_missing)
-        # Project
-        if table.use_columns:
-            reader = reader.project(*table.use_columns)
-        elif table.treat_as == 'events' and len(reader.header) > 3:
+        # Project (this is pushed down below field parsing)
+        if table_cfg.use_columns:
+            reader = reader.project(*table_cfg.use_columns)
+        elif table_cfg.treat_as == 'events' and len(reader.header) > 3:
             reader = reader.project(*range(3))
-        elif table.treat_as == 'examples' and len(reader.header) > 4:
+        elif (table_cfg.treat_as == 'examples'
+              and len(reader.header) > 4):
             reader = reader.project(*range(4))
         # Bulk load records from file into table
         table = db.make_table(reader.name, reader.header)
