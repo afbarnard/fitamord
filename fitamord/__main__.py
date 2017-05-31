@@ -31,6 +31,9 @@ _time_stop_idx = 2
 _label_idx = 3
 
 
+# Data validation # TODO should this go elsewhere?
+
+
 def make_is_missing(missing_values):
     missing_strs = {
         (str(val).strip().lower() if val is not None else None)
@@ -38,6 +41,39 @@ def make_is_missing(missing_values):
     def is_missing(text):
         return text.strip().lower() in missing_strs
     return is_missing
+
+
+def is_valid_fact(record):
+    return record[0] is not None
+
+
+def is_valid_event(record):
+    return all(record[i] is not None for i in range(3))
+
+
+def is_valid_example(record):
+    return (all(record[i] is not None for i in range(4))
+            and type(record[1]) == type(record[2]) # TODO replace with "can type 1 be ordered wrt type 2?"
+            and record[1] <= record[2])
+
+
+def make_discard_logger(logger, message):
+    def discard_logger(record):
+        logger.info(message, record)
+    return discard_logger
+
+
+def make_record_filter(filter, discard_handler):
+    def record_filter(record):
+        if filter(record):
+            return True
+        else:
+            discard_handler(record)
+            return False
+    return record_filter
+
+
+# Command line API
 
 
 def extension_combinations(extensions, *extension_collections):
@@ -206,8 +242,32 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         tables2treats[table.name] = table_cfg.treat_as
     tables = dict(db_tables)
 
+    # Record filters with logging discarders # TODO upgrade to add line numbers (from original file) to error messages
+    validation_logger = logging.getLogger('clean data')
+    filters = {
+        'facts': make_record_filter(
+            is_valid_fact,
+            make_discard_logger(
+                validation_logger,
+                'Discarding: Not a valid fact: {}')),
+        'events': make_record_filter(
+            is_valid_event,
+            make_discard_logger(
+                validation_logger,
+                'Discarding: Not a valid event: {}')),
+        'examples': make_record_filter(
+            is_valid_example,
+            make_discard_logger(
+                validation_logger,
+                'Discarding: Not a valid example: {}')),
+        }
+
     # Clean data: drop events without valid patient IDs, event IDs, or
     # times / ages
+    for name, table in tables.items():
+        treatment = tables2treats[name]
+        # Retain only valid records, discard others
+        tables[name] = table.select(filters[treatment])
 
     # Collect event types
 

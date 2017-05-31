@@ -245,6 +245,7 @@ class Table(db.Table):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._project_cols = None
+        self._filter_predicate = None
         self._order_by_cols = None
 
     # Reading
@@ -274,7 +275,10 @@ class Table(db.Table):
                 name + ' ' + order
                 for (name, order) in self._order_by_cols)
             query += ' order by ' + cols
-        return gen_fetchmany(self._db.execute_query(query))
+        rows = gen_fetchmany(self._db.execute_query(query))
+        if self._filter_predicate is not None:
+            rows = filter(self._filter_predicate, rows)
+        return rows
 
     # Queries
 
@@ -286,6 +290,10 @@ class Table(db.Table):
         table = copy.copy(self)
         table._project_cols = columns
         return table
+
+    def select(self, predicate):
+        self._filter_predicate = predicate
+        return self
 
     def order_by(self, *cols):
         self.assert_connected()
