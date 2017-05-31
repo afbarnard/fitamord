@@ -213,6 +213,7 @@ class FitamordConfig:
             self._build_tables(dict_['tables'], 'tables', *contexts)
             if 'tables' in dict_
             else None)
+        self._contexts = contexts
 
     def _build_is_missing(self, obj, *contexts):
         if obj is None:
@@ -256,6 +257,17 @@ class FitamordConfig:
         else:
             return self._dict
 
+    def validate_data_treatments(self):
+        treatments = set(t.treat_as for t in self.tables)
+        if 'facts' not in treatments and 'events' not in treatments:
+            raise ConfigError(
+                'No tables are treated as facts or events',
+                None, *self._contexts)
+        if 'examples' not in treatments:
+            raise ConfigError(
+                'No tables are treated as examples',
+                None, *self._contexts)
+
 
 _names2types = {
     'bool': bool,
@@ -277,7 +289,7 @@ _names2types = {
 
 class TabularFileConfig:
 
-    _treatments = {'events', 'examples', 'features'}
+    treatments = {'facts', 'features', 'events', 'examples'}
 
     def __init__(self, name, dict_=None, *contexts):
         self._name = name
@@ -292,7 +304,7 @@ class TabularFileConfig:
         self._id_cols = self._build_column_refs(
             self._dict.get('id', None), 'id', *contexts)
         treat_as = self._dict.get('treat as', None)
-        if treat_as is not None and treat_as not in self._treatments:
+        if treat_as is not None and treat_as not in self.treatments:
             raise ConfigError(
                 'Unrecognized treatment', treat_as,
                 'treat as', *contexts)

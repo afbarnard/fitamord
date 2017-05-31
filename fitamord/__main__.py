@@ -83,6 +83,13 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     logger.info('Writing configuration to: {}', gen_config_file)
     config.save(config_obj, gen_config_file, insert_defaults=True)
 
+    # Validate data treatments.  This has to be done after writing the
+    # configuration to make sure there is a configuration to refer to in
+    # the case of configuration detection.
+    config_obj.validate_data_treatments()
+
+    # TODO end: generate and validate configuration
+
     # Create function for recognizing missing values
     is_missing = (make_is_missing(config_obj.is_missing)
                   if config_obj.is_missing
