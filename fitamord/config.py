@@ -209,6 +209,11 @@ class FitamordConfig:
                 dict_['is_missing'], 'is_missing', *contexts)
             if 'is_missing' in dict_
             else None)
+        self._is_positive = (
+            self._build_is_positive(
+                dict_['is_positive'], 'is_positive', *contexts)
+            if 'is_positive' in dict_
+            else None)
         self._tables = (
             self._build_tables(dict_['tables'], 'tables', *contexts)
             if 'tables' in dict_
@@ -229,6 +234,17 @@ class FitamordConfig:
                 'Not a list of strings that indicate missing',
                 obj, *contexts)
 
+    def _build_is_positive(self, obj, *contexts):
+        if obj is None:
+            return None
+        elif isinstance(obj, str):
+            return [obj]
+        elif isinstance(obj, list):
+            return obj
+        else:
+            raise ConfigError(
+                'Not a list of positive labels', obj, *contexts)
+
     def _build_tables(self, dict_, *contexts):
         return tuple(TabularFileConfig(k, v, k, *contexts)
                      for (k, v) in dict_.items())
@@ -238,6 +254,10 @@ class FitamordConfig:
         if self._is_missing is None:
             return self.default_is_missing
         return self._is_missing
+
+    @property
+    def is_positive(self):
+        return self._is_positive
 
     @property
     def tables(self):

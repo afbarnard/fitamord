@@ -247,6 +247,7 @@ class Table(db.Table):
         self._project_cols = None
         self._filter_predicate = None
         self._order_by_cols = None
+        self._transformation = None
 
     # Reading
 
@@ -264,30 +265,36 @@ class Table(db.Table):
 
     _select_rows_sql = 'select {} from {}'
 
-    def _record_iterator(self):
+    def _record_iterator(self): # FIXME semantically incorrect because breaks nesting, but good enough for now
         self.assert_connected()
+        # Apply projection
         cols = (', '.join(self._project_cols)
                 if self._project_cols
                 else '*')
         query = self._select_rows_sql.format(cols, self.name)
+        # Apply sorting
         if self._order_by_cols:
             cols = ', '.join(
                 name + ' ' + order
                 for (name, order) in self._order_by_cols)
             query += ' order by ' + cols
         rows = gen_fetchmany(self._db.execute_query(query))
+        # Apply filtering
         if self._filter_predicate is not None:
             rows = filter(self._filter_predicate, rows)
+        # Apply transformation
+        if self._transformation is not None:
+            rows = map(self._transformation, rows)
         return rows
 
     # Queries
 
     def project(self, *cols):
-        self.assert_connected()
         # Interpret and validate columns
         columns = [self._interpret_column(col) for col in cols]
         # Create new table with desired columns
         table = copy.copy(self)
+        table._header = self.header.project(*cols)
         table._project_cols = columns
         return table
 
@@ -296,12 +303,15 @@ class Table(db.Table):
         return self
 
     def order_by(self, *cols):
-        self.assert_connected()
-        # Interpret and validate columns
-        columns = [self._interpret_order_by_column(col) for col in cols]
-        # Create new table with desired ordering
+        self._order_by_cols = [
+            self._interpret_order_by_column(col) for col in cols]
+        return self
+
+    def transform(self, header, transformation): # FIXME semantically incorrect because breaks nesting, but good enough for now
+        # Create a new table for the transformed records
         table = copy.copy(self)
-        table._order_by_cols = columns
+        table._header = header
+        table._transformation = transformation
         return table
 
     # Writing

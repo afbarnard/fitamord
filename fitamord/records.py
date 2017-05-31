@@ -162,6 +162,14 @@ class Header(NamedItems):
     def project(self, *columns):
         return Header(*(self[col] for col in columns))
 
+    def replace(self, old_field, new_name, new_type):
+        fields = list(self.fields())
+        if isinstance(old_field, Field):
+            old_field = old_field.name
+        idx = self.index_of(old_field)
+        fields[idx] = Field(new_name, new_type)
+        return Header(*fields)
+
     def as_yaml_object(self):
         return collections.OrderedDict(
             (f.name, f.typename) for f in self.fields())
@@ -315,6 +323,13 @@ class RecordStream:
     def join(self, table, alias=None):
         """Returns a table-like object that includes rows from this table and
         the given table.
+
+        """
+        return self # Dummy implementation
+
+    def transform(self, header, transformation):
+        """Returns a record stream that maps the given transformation over the
+        records in this record stream.
 
         """
         return self # Dummy implementation

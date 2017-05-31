@@ -4,6 +4,7 @@
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
+import collections
 import itertools as itools
 import sys
 
@@ -31,16 +32,35 @@ _time_stop_idx = 2
 _label_idx = 3
 
 
+# Data treatment # TODO should this go elsewhere?
+
+
+def make_recognizer(matching_values): # TODO move to general?
+    matches = set()
+    for val in matching_values:
+        # Canonicalize string values
+        if isinstance(val, str):
+            matches.add(val.strip().lower())
+        # Match other values as is
+        else:
+            matches.add(val)
+    def recognizer(obj):
+        if isinstance(obj, str):
+            return obj.strip().lower() in matches
+        return obj in matches
+    return recognizer
+
+
+def make_labeler(field_idx, is_positive):
+    def labeler(record):
+        if isinstance(record, tuple):
+            record = list(record)
+        record[field_idx] = is_positive(record[field_idx])
+        return record
+    return labeler
+
+
 # Data validation # TODO should this go elsewhere?
-
-
-def make_is_missing(missing_values):
-    missing_strs = {
-        (str(val).strip().lower() if val is not None else None)
-        for val in missing_values}
-    def is_missing(text):
-        return text.strip().lower() in missing_strs
-    return is_missing
 
 
 def is_valid_fact(record):
@@ -143,7 +163,7 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # TODO end: generate and validate configuration
 
     # Create function for recognizing missing values
-    is_missing = (make_is_missing(config_obj.is_missing)
+    is_missing = (make_recognizer(config_obj.is_missing)
                   if config_obj.is_missing
                   else None)
 
@@ -233,12 +253,14 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Recognize study periods by (patient ID, start, stop, dose, label)
     # format
 
-    # Look up tables and data treatment
+    # Look up tables and organize by table data treatment
     db_tables = {}
+    treats2tables = collections.defaultdict(list)
     tables2treats = {}
     for table_cfg in config_obj.tables:
         table = db.table(table_cfg.name)
         db_tables[table.name] = table
+        treats2tables[table_cfg.treat_as].append(table.name)
         tables2treats[table.name] = table_cfg.treat_as
     tables = dict(db_tables)
 
@@ -269,6 +291,22 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         # Retain only valid records, discard others
         tables[name] = table.select(filters[treatment])
 
+    # Create function for recognizing positive labels
+    is_positive = (make_recognizer(config_obj.is_positive)
+                   if config_obj.is_positive
+                   else bool)
+    positive_labeler = make_labeler(_label_idx, is_positive)
+
+    # Apply data treatments
+    # Examples
+    for name in treats2tables['examples']:
+        # Translate the existing label to a boolean label
+        table = tables[name]
+        tables[name] = table.transform(
+            table.header.replace(_label_idx, 'label', bool),
+            positive_labeler,
+            )
+
     # Collect event types
 
     # Define features
@@ -278,6 +316,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
             *(tables[k] for k in sorted(tables.keys())),
             key=_pt_id_idx):
         print(record_collection)
+        if 'examples' in record_collection:
+            print('examples:', record_collection['examples'])
 
     # Make a feature vector for each patient
 
