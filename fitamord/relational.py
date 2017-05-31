@@ -71,7 +71,7 @@ class MergeCollect(Relations):
     """
 
 
-    def __init__(self, *relations):
+    def __init__(self, *relations, key=0):
         """Creates an object that merge-collects the given relations.
 
         A relation is either a record stream or a (record stream, key)
@@ -84,26 +84,24 @@ class MergeCollect(Relations):
         """
         super().__init__()
         self._groupbys = []
+        arg_key = key
         for relation in relations:
             # Interpret, validate, and add relation
             relation, key = self._interpret_as_ordered_relation(
-                relation)
+                relation, key=arg_key)
             self.add(relation)
             # Sort the relation by key
             relation = relation.order_by(key)
             # Get the column index
-            col_idx = (key
-                       if isinstance(key, int)
-                       else relation.header.index_of(key))
+            col_idx = relation.header.index_of(key)
             # Construct the group by for the key
             self._groupbys.append(
                 itools.groupby(relation.records(),
                                operator.itemgetter(col_idx)))
 
     @staticmethod
-    def _interpret_as_ordered_relation(obj):
+    def _interpret_as_ordered_relation(obj, key=0):
         relation = None
-        key = 0
         if isinstance(obj, RecordStream):
             relation = obj
         elif isinstance(obj, tuple) and len(obj) == 2:
@@ -141,8 +139,17 @@ class MergeCollect(Relations):
         return relation, key
 
     def merge_collect(self):
+        """Silently skips any records whose key is None"""
         # Get the initial key-group pairs
         keys_groups = [next(gb, None) for gb in self._groupbys]
+        # Increment until all the keys are not None (discard groups with
+        # keys that are None)
+        for idx in range(len(keys_groups)):
+            while (keys_groups[idx] is not None
+                   and keys_groups[idx][0] is None):
+                keys_groups[idx] = next(self._groupbys[idx], None)
+        # Get the initial keys (which should not be None unless the
+        # corresponding group-by iterator is exhausted)
         keys = [(kg[0] if kg is not None else None)
                 for kg in keys_groups]
         # Loop while any of the groupby iterators have items
@@ -158,8 +165,16 @@ class MergeCollect(Relations):
             yield records
             # Increment
             for min_idx in min_idxs:
+                # Get the next group
                 keys_groups[min_idx] = next(
                     self._groupbys[min_idx], None)
+                # Increment until the key is not None (discard groups
+                # with keys that are None)
+                while (keys_groups[min_idx] is not None
+                       and keys_groups[min_idx][0] is None):
+                    keys_groups[min_idx] = next(
+                        self._groupbys[min_idx], None)
+                # Get the key for the next group
                 keys[min_idx] = (keys_groups[min_idx][0]
                                  if keys_groups[min_idx] is not None
                                  else None)

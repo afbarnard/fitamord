@@ -12,6 +12,7 @@ from barnapy import logging
 
 from . import config
 from . import delimited
+from . import relational
 from . import version
 from .engines import sqlite
 
@@ -196,6 +197,15 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Recognize study periods by (patient ID, start, stop, dose, label)
     # format
 
+    # Look up tables and data treatment
+    db_tables = {}
+    tables2treats = {}
+    for table_cfg in config_obj.tables:
+        table = db.table(table_cfg.name)
+        db_tables[table.name] = table
+        tables2treats[table.name] = table_cfg.treat_as
+    tables = dict(db_tables)
+
     # Clean data: drop events without valid patient IDs, event IDs, or
     # times / ages
 
@@ -204,7 +214,10 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Define features
 
     # Merge-collect records based on patient ID
-    key_fields = (_pt_id_idx,)
+    for record_collection in relational.MergeCollect(
+            *(tables[k] for k in sorted(tables.keys())),
+            key=_pt_id_idx):
+        print(record_collection)
 
     # Make a feature vector for each patient
 
