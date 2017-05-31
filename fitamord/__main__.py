@@ -3,6 +3,7 @@
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
+
 import itertools as itools
 import sys
 
@@ -13,6 +14,20 @@ from . import config
 from . import delimited
 from . import version
 from .engines import sqlite
+
+
+# Constants that may need to be parameterized
+
+# Events
+_ev_len = 3
+_pt_id_idx = 0
+_time_idx = 1
+_evtype_idx = 2
+# Examples
+_ex_len = 4
+_time_start_idx = 1
+_time_stop_idx = 2
+_label_idx = 3
 
 
 def make_is_missing(missing_values):
@@ -129,11 +144,12 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         # Project (this is pushed down below field parsing)
         if table_cfg.use_columns:
             reader = reader.project(*table_cfg.use_columns)
-        elif table_cfg.treat_as == 'events' and len(reader.header) > 3:
-            reader = reader.project(*range(3))
+        if (table_cfg.treat_as == 'events'
+                and len(reader.header) > _ev_len):
+            reader = reader.project(*range(_ev_len))
         elif (table_cfg.treat_as == 'examples'
-              and len(reader.header) > 4):
-            reader = reader.project(*range(4))
+              and len(reader.header) > _ex_len):
+            reader = reader.project(*range(_ex_len))
         # Bulk load records from file into table
         table = db.make_table(reader.name, reader.header)
         table.add_all(reader)
@@ -141,7 +157,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
             'Loaded {} records from {} into {}',
             table.count_rows(), table_file.path, table.name)
 
-    # Above: ahdb.  Below: fitamord.
+    # Above: ahdb.  Below: fitamord.  (Except validation pushed up
+    # before data loading as much as possible.)
 
     # So, the proper way to treat tabular files is as a `Table` and not
     # as a `RecordStream`.  That is, the table would know some things
@@ -169,6 +186,9 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Guess at fields that make up an event: first integer field is
     # patient ID, first float field is time / age, first str field is
     # event ID.  Or require and use names?
+    # *** No, just assume based on data treatment ("treat as") and
+    # position or names ("use") as given in config
+    # TODO convert config to interpret "event(patient_id, age, dx_code)" and the like
 
     # Types of tables: demographics, events (drugs, conds, procs,
     # symptoms), events with values (labs, vitals), labels
@@ -184,7 +204,7 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Define features
 
     # Merge-collect records based on patient ID
-    key_fields = ('patient_id',)
+    key_fields = (_pt_id_idx,)
 
     # Make a feature vector for each patient
 
