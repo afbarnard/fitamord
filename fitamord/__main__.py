@@ -11,6 +11,7 @@ from barnapy import logging
 
 from . import config
 from . import delimited
+from . import version
 from .engines import sqlite
 
 
@@ -46,6 +47,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Start logging
     logging.default_config()
     logger = logging.getLogger('main')
+    logger.info('Fitamord {}', version.__version__)
+    logging.log_runtime_environment(logger)
 
     # Check base directory exists
     if not base_directory.is_readable_directory():
@@ -128,8 +131,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         table = db.make_table(reader.name, reader.header)
         table.add_all(reader)
         logger.info(
-            'Loaded {} records from {} into {}'
-            .format(table.count_rows(), table_file.path, table.name))
+            'Loaded {} records from {} into {}',
+            table.count_rows(), table_file.path, table.name)
 
     # Above: ahdb.  Below: fitamord.
 
