@@ -21,6 +21,7 @@ from .engines import sqlite
 
 # Constants that may need to be parameterized
 
+
 # Events
 _ev_len = 3
 _pt_id_idx = 0
@@ -50,15 +51,6 @@ def make_recognizer(matching_values): # TODO move to general?
             return obj.strip().lower() in matches
         return obj in matches
     return recognizer
-
-
-def make_labeler(field_idx, is_positive):
-    def labeler(record):
-        if isinstance(record, tuple):
-            record = list(record)
-        record[field_idx] = is_positive(record[field_idx])
-        return record
-    return labeler
 
 
 # Data validation # TODO should this go elsewhere?
@@ -92,6 +84,17 @@ def make_record_filter(filter, discard_handler):
             discard_handler(record)
             return False
     return record_filter
+
+
+# Input / Output
+
+
+def print_as_svmlight(label, feature_vector_dict, file=sys.stdout):
+    print(label, end='', file=file)
+    for idx in sorted(feature_vector_dict.keys()):
+        print(' ', idx, ':', feature_vector_dict[idx],
+              sep='', end='', file=file)
+    print(file=file)
 
 
 # Command line API
@@ -257,6 +260,9 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         treats2tables[table_cfg.treat_as].append(table.name)
         tables2treats[table.name] = table_cfg.treat_as
     tables = dict(db_tables)
+    # Sort table names
+    for table_names in treats2tables.values():
+        table_names.sort()
 
     # Load features if defined
     if 'features' in treats2tables and treats2tables['features']:
@@ -280,9 +286,11 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         feats = features.detect(
             [tables[name] for name in fact_tables_names],
             [tables[name] for name in event_tables_names],
-            _pt_id_idx,
-            _evtype_idx,
+            fact_key_field=_pt_id_idx,
+            event_type_field=_evtype_idx,
+            positive_label=config_obj.positive_label,
             numeric_features=config_obj.numeric_features,
+            features_are_counts=config_obj.features_are_counts,
             )
         if not feats:
             logger.error('No features detected in: {}', feats_tables_names)
@@ -322,41 +330,22 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         if treatment in filters:
             tables[name] = table.select(filters[treatment])
 
-    # Create function for recognizing positive labels
-    is_positive = (make_recognizer(config_obj.is_positive)
-                   if config_obj.is_positive
-                   else bool)
-    positive_labeler = make_labeler(_label_idx, is_positive)
-
-    # Apply data treatments
-    # Examples
-    for name in treats2tables['examples']:
-        # Translate the existing label to a boolean label
-        table = tables[name]
-        tables[name] = table.transform(
-            table.header.replace(_label_idx, 'label', bool),
-            positive_labeler,
-            )
-
     # Data tables
-    data_table_names = []
-    for treatment in ('facts', 'events', 'examples'):
-        data_table_names.extend(sorted(treats2tables[treatment]))
+    data_table_names = (treats2tables['facts']
+                        + treats2tables['events']
+                        + treats2tables['examples'])
 
     # Merge-collect records based on patient ID
     for record_collection in relational.MergeCollect(
             *(tables[n] for n in data_table_names),
             key=_pt_id_idx):
-        print(record_collection)
-        if 'examples' in record_collection:
-            print('examples:', record_collection['examples'])
+        # Generate feature vectors from this collection of records
+        for feature_vector in features.generate_feature_vectors(
+                feats, record_collection, treats2tables, _time_idx):
+            label = feature_vector.get(2, 0) # FIXME look up label feature; don't assume numeric values
+            print_as_svmlight(label, feature_vector)
 
     # TODO blacklists
-
-    # Make a feature vector for each patient per label (study) period
-    # TODO: attr-id, attr-label (as facts)
-
-    # Output feature vector (in dense or sparse form)
 
     # Cleanup # TODO write and use context manager
     db.close()
