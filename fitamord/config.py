@@ -209,10 +209,10 @@ class FitamordConfig:
                 dict_['is_missing'], 'is_missing', *contexts)
             if 'is_missing' in dict_
             else None)
-        self._is_positive = (
-            self._build_is_positive(
-                dict_['is_positive'], 'is_positive', *contexts)
-            if 'is_positive' in dict_
+        self._positive_label = (
+            self._build_positive_label(
+                dict_['positive_label'], 'positive_label', *contexts)
+            if 'positive_label' in dict_
             else None)
         self._tables = (
             self._build_tables(dict_['tables'], 'tables', *contexts)
@@ -234,16 +234,14 @@ class FitamordConfig:
                 'Not a list of strings that indicate missing',
                 obj, *contexts)
 
-    def _build_is_positive(self, obj, *contexts):
+    def _build_positive_label(self, obj, *contexts):
         if obj is None:
             return None
-        elif isinstance(obj, str):
-            return [obj]
-        elif isinstance(obj, list):
+        elif isinstance(obj, (str, int, bool)):
             return obj
         else:
             raise ConfigError(
-                'Not a list of positive labels', obj, *contexts)
+                'Not a suitable positive label', obj, *contexts)
 
     def _build_tables(self, dict_, *contexts):
         return tuple(TabularFileConfig(k, v, k, *contexts)
@@ -256,8 +254,10 @@ class FitamordConfig:
         return self._is_missing
 
     @property
-    def is_positive(self):
-        return self._is_positive
+    def positive_label(self):
+        if self._positive_label is not None:
+            return self._positive_label
+        return 1
 
     @property
     def tables(self):
@@ -267,6 +267,10 @@ class FitamordConfig:
     def numeric_features(self): # TODO allow to be configured
         return True
 
+    @property
+    def features_are_counts(self): # TODO allow to be configured
+        return True
+
     def as_dict(self):
         return self._dict
 
@@ -274,7 +278,9 @@ class FitamordConfig:
         if insert_defaults:
             dict_ = dict(self._dict)
             if 'is_missing' not in dict_:
-                dict_['is_missing'] = self.default_is_missing
+                dict_['is_missing'] = self.is_missing
+            if 'positive_label' not in dict_:
+                dict_['positive_label'] = self.positive_label
             if 'tables' not in dict_:
                 dict_['tables'] = None
             return dict_
