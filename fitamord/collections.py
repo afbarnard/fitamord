@@ -69,6 +69,10 @@ class NamedItems:
             return self.item_of(index)
         return self.item_at(index)
 
+    def __setitem__(self, index, value):
+        idx = self.index_of(index)
+        self._items[idx] = value
+
     # Imitate a list here by iterating over items, not (name, item)
     # pairs.  This also matches the default iteration behavior one gets
     # from defining `__len__` and `__getitem__`.
