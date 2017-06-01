@@ -13,6 +13,7 @@ from barnapy import logging
 
 from . import config
 from . import delimited
+from . import features
 from . import relational
 from . import version
 from .engines import sqlite
@@ -114,6 +115,7 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     compression_extensions = {'gz', 'bz2', 'xz'}
     config_filename = 'fitamord_config.yaml'
     generated_config_filename = 'fitamord_config.generated.yaml'
+    generated_features_filename = 'features.generated.csv'
     db_filename = 'fitamord.sqlite'
 
     # Start logging
@@ -238,20 +240,12 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
 
     # include relational rename in projection like in SQL?
 
-    # Define events
-
     # Guess at fields that make up an event: first integer field is
     # patient ID, first float field is time / age, first str field is
     # event ID.  Or require and use names?
     # *** No, just assume based on data treatment ("treat as") and
     # position or names ("use") as given in config
     # TODO convert config to interpret "event(patient_id, age, dx_code)" and the like
-
-    # Types of tables: demographics, events (drugs, conds, procs,
-    # symptoms), events with values (labs, vitals), labels
-
-    # Recognize study periods by (patient ID, start, stop, dose, label)
-    # format
 
     # Look up tables and organize by table data treatment
     db_tables = {}
@@ -263,6 +257,42 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         treats2tables[table_cfg.treat_as].append(table.name)
         tables2treats[table.name] = table_cfg.treat_as
     tables = dict(db_tables)
+
+    # Load features if defined
+    if 'features' in treats2tables and treats2tables['features']:
+        feats_table_name = treats2tables['features'][0]
+        logger.info('Loading features from: {}', feats_table_name)
+        feats = features.load(tables[feats_table_name])
+        if not feats:
+            logger.error('No features defined in: {}', feats_table_name)
+            return
+        # Make sure features are numeric
+        if config_obj.numeric_features:
+            feats = features.encode_categorical_features(feats, tables)
+    # Otherwise detect features
+    else:
+        fact_tables_names = sorted(treats2tables['facts'])
+        event_tables_names = sorted(treats2tables['events'])
+        logger.info(
+            'No features table specified: '
+            'Detecting features in tables: {}',
+            fact_tables_names + event_tables_names)
+        feats = features.detect(
+            [tables[name] for name in fact_tables_names],
+            [tables[name] for name in event_tables_names],
+            _pt_id_idx,
+            _evtype_idx,
+            numeric_features=config_obj.numeric_features,
+            )
+        if not feats:
+            logger.error('No features detected in: {}', feats_tables_names)
+            return
+    # Write features
+    feats_file = base_directory.join(generated_features_filename)
+    logger.info('Writing features to: {}', feats_file)
+    features.save(feats, feats_file)
+
+    # TODO end: feature generation
 
     # Record filters with logging discarders # TODO upgrade to add line numbers (from original file) to error messages
     validation_logger = logging.getLogger('clean data')
@@ -289,7 +319,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     for name, table in tables.items():
         treatment = tables2treats[name]
         # Retain only valid records, discard others
-        tables[name] = table.select(filters[treatment])
+        if treatment in filters:
+            tables[name] = table.select(filters[treatment])
 
     # Create function for recognizing positive labels
     is_positive = (make_recognizer(config_obj.is_positive)
@@ -307,19 +338,23 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
             positive_labeler,
             )
 
-    # Collect event types
-
-    # Define features
+    # Data tables
+    data_table_names = []
+    for treatment in ('facts', 'events', 'examples'):
+        data_table_names.extend(sorted(treats2tables[treatment]))
 
     # Merge-collect records based on patient ID
     for record_collection in relational.MergeCollect(
-            *(tables[k] for k in sorted(tables.keys())),
+            *(tables[n] for n in data_table_names),
             key=_pt_id_idx):
         print(record_collection)
         if 'examples' in record_collection:
             print('examples:', record_collection['examples'])
 
-    # Make a feature vector for each patient
+    # TODO blacklists
+
+    # Make a feature vector for each patient per label (study) period
+    # TODO: attr-id, attr-label (as facts)
 
     # Output feature vector (in dense or sparse form)
 

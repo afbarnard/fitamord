@@ -263,6 +263,10 @@ class FitamordConfig:
     def tables(self):
         return self._tables
 
+    @property
+    def numeric_features(self): # TODO allow to be configured
+        return True
+
     def as_dict(self):
         return self._dict
 
