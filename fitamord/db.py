@@ -201,6 +201,15 @@ def assert_sql_identifier(text):
     if not is_sql_identifier(text):
         raise DbSyntaxError('Bad SQL identifier: "{}"'.format(text))
 
+def quote_name(name, quote='"'):
+    # Column indices do not need quoting
+    if isinstance(name, int):
+        return name
+    elif isinstance(name, str):
+        return DottedName(name).quote_parts(quote)
+    else:
+        raise ValueError('Not a DB name: {!r}'.format(name))
+
 def unquote(text, quote='"'):
     """Returns the unquoted version of the text.
 
@@ -300,6 +309,10 @@ class CompoundName:
 
     def __str__(self):
         return self.name
+
+    def quote_parts(self, quote_char='"'):
+        return self._delimiter.join(
+            quote_char + part + quote_char for part in self.parts)
 
 
 class DottedName(CompoundName):

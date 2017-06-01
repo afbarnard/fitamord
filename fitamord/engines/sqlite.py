@@ -146,17 +146,17 @@ class SqliteDb(db.Database):
         if types is None:
             parameters = None
             query = self._list_objects_sql.format(
-                catalog_table_name.name)
+                db.quote_name(catalog_table_name.name))
         elif hasattr(types, '__iter__') and not isinstance(types, str):
             parameters = tuple(
                 db.DbObjectType.convert(o).name for o in types)
             query = self._list_objects_with_types_sql.format(
-                catalog_table_name.name,
+                db.quote_name(catalog_table_name.name),
                 placeholders_for_params(len(parameters)))
         else:
             parameters = (db.DbObjectType.convert(types).name,)
             query = self._list_objects_with_types_sql.format(
-                catalog_table_name.name,
+                db.quote_name(catalog_table_name.name),
                 placeholders_for_params(len(parameters)))
         # Generate the objects as (name, type, sql) tuples
         yield from gen_fetchmany(self.execute_query(query, parameters))
@@ -166,7 +166,8 @@ class SqliteDb(db.Database):
     def schema(self, name):
         dotted_name, namespace, obj_name = self._process_name(name)
         catalog_table_name = self._catalog_table_name(namespace)
-        query = self._schema_sql.format(catalog_table_name.name)
+        query = self._schema_sql.format(
+            db.quote_name(catalog_table_name.name))
         schemas = list(
             gen_fetchmany(self.execute_query(query, (obj_name,))))
         if len(schemas) == 0:
@@ -184,14 +185,15 @@ class SqliteDb(db.Database):
         # Create the fields definition from the header
         fields = []
         for field in header:
-            field_def = field.name
+            field_def = db.quote_name(field.name)
             field_type = self.translate_type(field.type)
             if field_type:
                 field_def += ' ' + field_type
             fields.append(field_def)
         fields_def = ', '.join(fields)
         # Build and run the query
-        query = self._create_table_sql.format(name, fields_def)
+        query = self._create_table_sql.format(
+            db.quote_name(name), fields_def)
         rows = list(gen_fetchmany(self.execute_query(query)))
         if rows:
             raise db.DbError('Create returned rows: {}'.format(rows))
@@ -207,7 +209,7 @@ class SqliteDb(db.Database):
         if dotted_name in self._tables:
             self._tables[dotted_name].disconnect()
             del self._tables[dotted_name]
-        query = self._drop_table_sql.format(name)
+        query = self._drop_table_sql.format(db.quote_name(name))
         rows = list(gen_fetchmany(self.execute_query(query)))
         if rows:
             raise db.DbError('Drop table returned rows: {}'.format(rows))
@@ -255,7 +257,7 @@ class Table(db.Table):
 
     def count_rows(self):
         self.assert_connected()
-        query = self._count_rows_sql.format(self.name)
+        query = self._count_rows_sql.format(db.quote_name(self.name))
         rows = list(gen_fetchmany(self._db.execute_query(query)))
         if len(rows) != 1:
             raise db.DbError('Not a single row: {}'.format(rows))
@@ -268,14 +270,16 @@ class Table(db.Table):
     def _record_iterator(self): # FIXME semantically incorrect because breaks nesting, but good enough for now
         self.assert_connected()
         # Apply projection
-        cols = (', '.join(self._project_cols)
+        cols = (', '.join(db.quote_name(col)
+                          for col in self._project_cols)
                 if self._project_cols
                 else '*')
-        query = self._select_rows_sql.format(cols, self.name)
+        query = self._select_rows_sql.format(
+            cols, db.quote_name(self.name))
         # Apply sorting
         if self._order_by_cols:
             cols = ', '.join(
-                name + ' ' + order
+                db.quote_name(name) + ' ' + order
                 for (name, order) in self._order_by_cols)
             query += ' order by ' + cols
         rows = gen_fetchmany(self._db.execute_query(query))
@@ -324,10 +328,11 @@ class Table(db.Table):
                   if isinstance(records, recs.RecordStream)
                   else self.header)
         # Assemble query
-        col_names = '(' + ', '.join(header.names()) + ')'
+        col_names = '(' + ', '.join(db.quote_name(n)
+                                    for n in header.names()) + ')'
         param_placeholder = placeholders_for_params(self.n_cols)
         query = self._add_all_sql.format(
-            self.name, col_names, param_placeholder)
+            db.quote_name(self.name), col_names, param_placeholder)
         # Run query
         cursor = self._db.execute_many(query, records)
         rows = list(gen_fetchmany(cursor))
@@ -342,7 +347,7 @@ class Table(db.Table):
 
     def clear(self):
         self.assert_connected()
-        query = self._clear_sql.format(self.name)
+        query = self._clear_sql.format(db.quote_name(self.name))
         cursor = self._db.execute_query(query)
         rows = list(gen_fetchmany(cursor))
         if rows:
