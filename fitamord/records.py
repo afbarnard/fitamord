@@ -343,7 +343,7 @@ class RecordStream:
                 'Not a column name or index: {!r}'.format(col))
         # Check column exists
         if col not in self.header:
-            raise DbError(
+            raise ValueError(
                 '{}: No such column: {}'.format(self.name, col))
         # Convert column index to name
         if isinstance(col, int):
@@ -367,7 +367,7 @@ class RecordStream:
         # Check column specification
         name, order = col_spec
         if name not in self.header:
-            raise DbError(
+            raise ValueError(
                 '{}: No such column: {}'.format(self.name, name))
         if order not in ('asc', 'desc'):
             raise ValueError(
