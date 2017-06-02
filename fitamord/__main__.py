@@ -8,8 +8,8 @@ import collections
 import itertools as itools
 import sys
 
-from barnapy import files
-from barnapy import logging
+from .include.barnapy import files
+from .include.barnapy import logging
 
 from . import config
 from . import delimited

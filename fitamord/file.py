@@ -9,7 +9,8 @@ import io
 import pathlib
 import re
 
-import barnapy.parse
+from .include.barnapy import parse
+
 from . import records
 
 
@@ -262,7 +263,7 @@ def parse_literal(text):
     if not text or text.isspace():
         return None
     else:
-        return barnapy.parse.literal(text)
+        return parse.literal(text)
 
 
 def make_record_transformer(header, transformation):

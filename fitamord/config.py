@@ -7,10 +7,11 @@ import collections
 import datetime
 
 import yaml
-from barnapy import files
-from barnapy import logging
-from barnapy import parse
-from barnapy import unixutils
+
+from .include.barnapy import files
+from .include.barnapy import logging
+from .include.barnapy import parse
+from .include.barnapy import unixutils
 
 from . import delimited
 from . import records

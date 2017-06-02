@@ -14,9 +14,9 @@ import io
 import itertools as itools
 from enum import Enum
 
-from barnapy import files
-from barnapy import logging
-from barnapy import parse
+from .include.barnapy import files
+from .include.barnapy import logging
+from .include.barnapy import parse
 
 from . import file
 from . import general
