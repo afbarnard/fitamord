@@ -28,6 +28,8 @@ include_dir = os.path.join(base_dir, 'include')
 # Add all subdirectories of `include_dir` to `__path__` so that they can
 # be accessed as subpackages / submodules.
 dir_lister = os.walk(include_dir)
-_, directories, _ = next(dir_lister)
-for directory in directories:
-    __path__.append(os.path.join(include_dir, directory))
+dir_objects = next(dir_lister, None)
+if dir_objects is not None:
+    _, directories, _ = dir_objects
+    for directory in directories:
+        __path__.append(os.path.join(include_dir, directory))
