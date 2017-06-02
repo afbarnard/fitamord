@@ -1,0 +1,3 @@
+[submodule "include/barnapy"]
+	path = include/barnapy
+	url = https://github.com/afbarnard/barnapy.git
