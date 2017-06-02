@@ -1,6 +1,8 @@
 """Environments of hierarchical bindings"""
+
 # Copyright (c) 2016 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
+
 
 from . import general
 from . import parse

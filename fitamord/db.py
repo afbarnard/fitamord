@@ -3,10 +3,12 @@
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
+
 # TODO treat namespaces as objects (eventually, but not for now);
 # analogously to a filesystem, namespaces are directories and tables /
 # views / indices / etc. are files -> listing all the objects in a
 # namespace would list all child namespaces
+
 
 import re
 from enum import Enum

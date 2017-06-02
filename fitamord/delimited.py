@@ -4,8 +4,10 @@ Classes and functions for describing, reading, transforming, and
 otherwise working with tabular data in delimited text files.
 
 """
+
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
+
 
 import collections
 import copy

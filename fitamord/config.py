@@ -3,6 +3,7 @@
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
+
 import collections
 import datetime
 
@@ -21,7 +22,6 @@ from . import records
 # Command line arguments mapped into configuration.  Configuration files
 # mapped into configuration.  Configuration saved to configuration
 # files.
-
 
 
 class Configuration:
