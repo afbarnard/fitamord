@@ -45,15 +45,19 @@ setuptools.setup(
         ],
 
     # Packaging
-    #package_dir={'': 'fitamord'},
-    #include_package_data=True,
     #package_data={},
-    #download_url='',
+    # TODO include git submodules in source distribution
 
     # Requirements
     python_requires='>=3.4',
     install_requires=[
-        'scikit-learn >= 0.18.0',
+        # Do not include scikit-learn as a prerequisite because it
+        # installs well with `pip` only if NumPy and SciPy are already
+        # installed.  Therefore attempting an install is unpredictable
+        # and may lead to attempting to build everything from scratch,
+        # which is definitely not desired.
+
+        #'scikit-learn >= 0.17.0',
         'PyYAML >= 3.11',
         ],
 

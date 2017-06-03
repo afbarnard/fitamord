@@ -1,0 +1,9 @@
+# List of files to include in a source distribution that are not
+# included by default
+
+
+# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# under the MIT License.  See `LICENSE.txt` for details.
+
+
+include README.md LICENSE.txt makefile
