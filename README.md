@@ -49,45 +49,48 @@ Download, Install
 
 Note that you may first want to create a virtual environment, a space
 that can have its own versions of Python and packages.  A summary of how
-to do this is below, but (the details are
-here)[https://packaging.python.org/installing/#creating-virtual-environments].
-The alternative is to install things into your user account.
+to do this is below, but [the details are
+here](https://packaging.python.org/installing/#creating-virtual-environments).
+The alternative is to install things into your user account (home
+directory).
 
-0.1 Optionally create a virtual environment.
+0. Optional steps.
 
-        python3 -m venv <fitamord-venv>
-        cd <fitamord-venv>
-        source bin/activate
-        ... # install, update, do work, etc.
-        deactivate; cd .. # exit virtual environment
-        rm -Rf <fitamord-venv> # delete virtual environment
+   1. Create a virtual environment.
 
-0.2 Optionally update Pip and Setuptools.  You can do this globally for
-    your user or locally in your virtual environment.
+          python3 -m venv <fitamord-venv>
+          cd <fitamord-venv>
+          source bin/activate
+          ... # install, update, do work, etc.
+          deactivate; cd .. # exit virtual environment
+          rm -Rf <fitamord-venv> # delete virtual environment
 
-        python3 -m pip install --upgrade pip
-        python3 -m pip install --upgrade setuptools
+   2. Update Pip and Setuptools.  You can do this globally for your user
+      or locally in your virtual environment.
+
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade setuptools
 
 If you are using a virtual environment, you may omit the `--user`
 options from the commands below.  The `--user` option directs Python to
 install things in your user's home directory rather than the system
 directories, but a virtual environment has its own "system" directories.
-For more information, read the (Pip documentation)[https://pip.pypa.io].
+For more information, read the [Pip documentation](https://pip.pypa.io).
 
 1. Download and install in one go.  The `--editable` option instructs
    Pip to make a local copy of the repository for editing (development)
    and is necessary for Pip to download Git submodules.  Pip downloads
    the repository to `src/fitamord`.
 
-        python3 -m pip install --editable git+https://github.com/afbarnard/fitamord.git#egg=fitamord
+       python3 -m pip install --user --editable git+https://github.com/afbarnard/fitamord.git#egg=fitamord
 
 2. Update.
 
-        python3 -m pip install --upgrade fitamord
+       python3 -m pip install --upgrade fitamord
 
 3. Uninstall.
 
-        python3 -m pip uninstall fitamord
+       python3 -m pip uninstall fitamord
 
 The above is equivalent to the following individual steps which give you
 more control and may be more suitable outside a virtual environment or
