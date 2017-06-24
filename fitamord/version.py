@@ -4,4 +4,4 @@
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
-__version__ = '0.0.0'
+__version__ = '0.1.0'
