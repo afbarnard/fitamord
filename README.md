@@ -116,6 +116,110 @@ Or, the same thing without Pip (not recommended, but illustrative):
     rm fitamord.egg-link
 
 
+Usage
+-----
+
+The essential thing is to tell Fitamord how to interpret your data.  You
+do this through a configuration file.  If you run Fitamord without a
+configuration, it will guess at a configuration for you based on all the
+CSV files in the current directory.  So, to get started, change to your
+data directory and run Fitamord to create a stub configuration.
+
+    cd <data-directory>
+    python3 -m fitamord 2>fitamord.log
+
+In `fitamord_config.generated.yaml` you will find what Fitamord is using
+as its configuration.  In this case, since it started without any other
+configuration, this is what it detected, guessed, and assumed.  Fitamord
+will always use the configuration you specify and fill it in with what
+it can detect or assume.
+
+Fitamord will exit with an error that it did not find any tables with
+examples.  This is because Fitamord can't guess whether tables should be
+treated as facts, events, or examples.  You need to tell Fitamord this
+information in the configuration.
+
+Edit the configuration with a text editor to only include the relevant
+files as tables and to fill in each `treat as` field with "facts",
+"events", or "examples".  A fact is a data point without a timestamp
+(id, data), an event is a data point with a timestamp (id, time, data),
+and an example describes the study design (id, start_time, stop_time,
+label).  Note that for events and examples, Fitamord expects the fields
+in the order just given, so you may need to fill in the `use` option
+with a list of column numbers to say which fields to use and in what
+order.  Similarly, fill in `id` with the column number of the data ID if
+it is not the first column.  Finally, make sure the columns you are
+using have the correct data types.  Note that you can pare down your
+configuration by deleting anything that will have the same value as in
+the generated configuration.  Here is an example small configuration
+defining the data for a study of patients based on their demographics,
+drugs, and conditions.
+
+    %YAML 1.2
+    ---
+    is_missing:
+      - ''
+      - '?'
+      - na
+      - nil
+      - none
+      - 'null'
+      - '*not available'
+      - '* not available'
+    positive_label: G
+    tables:
+      demos:
+        file: demographics.csv
+        columns:
+          pt_id: int
+          birth_year: int
+          sex: str
+          death_age: float
+        treat as: facts
+      rxs:
+        file: meds.csv
+        columns:
+          pt_id: int
+          age: float
+          rx_code: int
+        treat as: events
+      dxs:
+        file: diagnoses.csv
+        columns:
+          pt_id: int
+          dx_code: str
+          age: float
+        use: 1, 3, 2
+        treat as: events
+      periods:
+        file: med_periods.csv
+        columns:
+          pt_id: int
+          start_age: float
+          stop_age: float
+          dose: float
+          label: str
+        use: 1, 2, 3, 5
+        treat as: examples
+    ...
+
+You may want to update the list of (case insensitive) values that
+signify missing information, and make sure to configure the correct
+postive label.
+
+Save your edited configuration as `fitamord_config.yaml`.  (Fitamord
+overwrites `fitamord_config.generated.yaml` each time with its
+operational configuration.)
+
+Now, run Fitamord again to transform your facts and events into feature
+vectors.
+
+    python3 -m fitamord 1>feature_vector_data.svmlight 2>fitamord.log
+
+The table of features will be in `features.generated.csv`.  Lastly,
+check the log for errors, warnings, and other information.
+
+
 -----
 
 Copyright (c) 2017 Aubrey Barnard.  This is free software released under
