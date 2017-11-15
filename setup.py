@@ -6,7 +6,13 @@
 
 import setuptools
 
-import fitamord.version
+import fitamord
+
+
+# Extract the descriptions from the package documentation
+_desc_paragraphs = fitamord.__doc__.strip().split('\n\n')
+_desc_short = _desc_paragraphs[0].replace('\n', ' ') # Needs to be one line
+_desc_long = _desc_paragraphs[1]
 
 
 # Define package attributes
@@ -14,17 +20,15 @@ setuptools.setup(
 
     # Basic characteristics
     name='fitamord',
-    version=fitamord.version.__version__,
+    version=fitamord.__version__,
     url='https://github.com/afbarnard/fitamord',
     license='MIT',
     author='Aubrey Barnard',
     #author_email='',
 
     # Description
-    description=(
-        'Framework for the intelligent transformation and '
-        'modeling of relational data'),
-    #long_description='',
+    description=_desc_short,
+    long_description=_desc_long,
     keywords=[
         'relational data',
         'data preparation',
@@ -34,7 +38,7 @@ setuptools.setup(
         'machine learning',
     ],
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Environment :: Console',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: MIT License',
@@ -43,10 +47,6 @@ setuptools.setup(
         'Programming Language :: Python :: 3 :: Only',
         'Topic :: Scientific/Engineering :: Information Analysis',
     ],
-
-    # Packaging
-    #package_data={},
-    # TODO include git submodules in source distribution
 
     # Requirements
     python_requires='~= 3.4',
