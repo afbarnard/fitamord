@@ -8,7 +8,7 @@ import copy
 import sqlite3
 import sys
 
-from ..include.barnapy import logging
+from barnapy import logging
 
 from .. import db
 from .. import general

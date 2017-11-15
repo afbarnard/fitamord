@@ -10,7 +10,7 @@ import io
 import pathlib
 import re
 
-from .include.barnapy import parse
+from barnapy import parse
 
 from . import records
 

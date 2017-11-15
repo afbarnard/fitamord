@@ -19,8 +19,8 @@
 
 from enum import Enum
 
-from .include.barnapy import files
-from .include.barnapy import logging
+from barnapy import files
+from barnapy import logging
 
 from . import general
 from . import records
