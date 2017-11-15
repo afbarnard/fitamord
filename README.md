@@ -77,43 +77,82 @@ install things in your user's home directory rather than the system
 directories, but a virtual environment has its own "system" directories.
 For more information, read the [Pip documentation](https://pip.pypa.io).
 
-1. Download and install in one go.  The `--editable` option instructs
-   Pip to make a local copy of the repository for editing (development)
-   and is necessary for Pip to download Git submodules.  Pip downloads
-   the repository to `src/fitamord`.
 
-       python3 -m pip install --user --editable git+https://github.com/afbarnard/fitamord.git#egg=fitamord
+### Quick and Easy ###
+
+1. Download and install.  Fitamord depends on Barnapy so install it too.
+
+       python3 -m pip install --user git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
 
 2. Update.
 
-       python3 -m pip install --upgrade fitamord
+       python3 -m pip install --user --upgrade git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
 
 3. Uninstall.
 
-       python3 -m pip uninstall fitamord
+       python3 -m pip uninstall --yes fitamord barnapy
 
-The above is equivalent to the following individual steps which give you
-more control and may be more suitable outside a virtual environment or
-when developing the software.
 
-    git clone --recursive https://github.com/afbarnard/fitamord.git [<fitamord-dir>] # download (to `fitamord` by default)
-    python3 -m pip install --user --editable <fitamord-dir> # install
-    python3 -m pip install --upgrade fitamord # update
-    python3 -m pip uninstall fitamord # uninstall
-    rm -R fitamord # remove repository
+### For Development or Reference ###
 
-Or, the same thing without Pip (not recommended, but illustrative):
+Alternatively, use these instructions if you want access to the Fitamord
+repository (e.g. for reference, debugging, or development) or if you
+want more control.
 
-    git clone --recursive https://github.com/afbarnard/fitamord.git [<fitamord-dir>] # download (to `fitamord` by default)
-    cd <fitamord-dir>
-    python3 setup.py develop --user # install
-    git pull # update
-    # manual uninstall
-    cd ..
-    rm -R <fitamord-dir> # remove repository
-    cd ~/.loca/lib/python3.<minor>/site-packages
-    sed -i.bak -e '/<fitamord-dir>/ d' easy-install.pth # delete <fitamord-dir> from `easy-install.pth`
-    rm fitamord.egg-link
+1. Download and install.  Note the `--editable` option.  This is what
+   tells Pip to download the repository to `src/fitamord`.  (Use the
+   `--src` option to specify a different download location.)
+
+       python3 -m pip install --user --editable git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+
+2. Update.
+
+       python3 -m pip install --user --upgrade --editable git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+
+3. Uninstall.
+
+       python3 -m pip uninstall --yes fitamord barnapy
+
+For more control you can use Git and Pip directly.
+
+    # Install dependencies (or use `requirements.txt`; see below)
+    python3 -m pip install --user git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+    # Download Fitamord to <fitamord-dir> (`fitamord` by default)
+    git clone https://github.com/afbarnard/fitamord.git [<fitamord-dir>]
+    # Install Fitamord
+    python3 -m pip install --user [--editable] <fitamord-dir>
+    # Update
+    git -C <fitamord-dir> pull
+    # Upgrade if the install is not editable
+    python3 -m pip install --user --upgrade <fitamord-dir>
+    # Uninstall
+    python3 -m pip uninstall --yes fitamord barnapy
+    rm -Rf <fitamord-dir>
+
+You can also install Fitamord and its dependencies by telling Pip to use
+the requirements file after downloading the Git repository, but this
+does not make the installation "editable".  Of course, you can always
+convert a plain install into an editable one by doing an upgrade with
+the `--editable` option.
+
+    git clone https://github.com/afbarnard/fitamord.git [<fitamord-dir>]
+    python3 -m pip install --user --requirement <fitamord-dir>/requirements.txt
+    # Run this command only if you want an editable install
+    python3 -m pip install --user --upgrade --editable <fitamord-dir>
+
+The difference between an editable install and a plain install is that
+an editable install points directly to the "live" files in the
+repository while a plain install copies the necessary files into a
+well-known location
+(e.g. `~/.local/lib/python3.<minor>/site-packages/`).  An editable
+install can be convenient for trying changes, but is usually unnecessary
+(as one can always run Python from the repository directory, which makes
+the repository files "live" because they appear first on the path) and
+is unsafe for long-running jobs like Fitamord (i.e. updating the
+repository or editing a module while a job is running can cause that job
+to crash or give incorrect results if it loads a module while that
+module is in an inconsistent state).  This is why the requirements file
+specifies a non-editable install.
 
 
 Usage

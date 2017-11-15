@@ -32,7 +32,7 @@ setuptools.setup(
         'feature functions',
         'data science',
         'machine learning',
-        ],
+    ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Environment :: Console',
@@ -42,14 +42,14 @@ setuptools.setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3 :: Only',
         'Topic :: Scientific/Engineering :: Information Analysis',
-        ],
+    ],
 
     # Packaging
     #package_data={},
     # TODO include git submodules in source distribution
 
     # Requirements
-    python_requires='>=3.4',
+    python_requires='~= 3.4',
     install_requires=[
         # Do not include scikit-learn as a prerequisite because it
         # installs well with `pip` only if NumPy and SciPy are already
@@ -57,12 +57,13 @@ setuptools.setup(
         # and may lead to attempting to build everything from scratch,
         # which is definitely not desired.
 
-        #'scikit-learn >= 0.17.0',
-        'PyYAML >= 3.11',
-        ],
+        #'scikit-learn ~= 0.17',
+        'PyYAML ~= 3.11',
+        'barnapy ~= 0.0',
+    ],
 
     # API
     packages=setuptools.find_packages(),
     #entry_points={}, # for scripts
 
-    )
+)
