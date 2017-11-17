@@ -11,11 +11,11 @@ import sys
 from barnapy import files
 from barnapy import logging
 
+from . import __version__
 from . import config
 from . import delimited
 from . import features
 from . import relational
-from . import version
 from .engines import sqlite
 
 
@@ -124,7 +124,7 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Start logging
     logging.default_config()
     logger = logging.getLogger('main')
-    logger.info('Fitamord {}', version.__version__)
+    logger.info('Fitamord {}', __version__)
     logging.log_runtime_environment(logger)
 
     # Check base directory exists
