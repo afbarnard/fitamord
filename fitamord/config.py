@@ -309,6 +309,7 @@ _names2types = {
     'float': float,
     'int': int,
     'integer': int,
+    'object': object,
     'real': float,
     'str': str,
     'string': str,
