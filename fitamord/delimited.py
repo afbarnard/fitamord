@@ -1,8 +1,8 @@
-"""Delimited text files
+"""
+Delimited text files
 
 Classes and functions for describing, reading, transforming, and
 otherwise working with tabular data in delimited text files.
-
 """
 
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
@@ -34,19 +34,48 @@ class EscapeStyle(Enum):
 class Format:
     """Format of a delimited text file"""
 
+    @staticmethod
+    def detect(sample_text): # TODO change to return ok rather than exception?
+        """Cannot detect escape characters"""
+        # Detect delimiter and quoting using the Sniffer internals to
+        # avoid defaulting of quote character.  (This follows csv.py.)
+        sniffer = csv.Sniffer()
+        quote_char, doubling, delimiter, strip = (
+            sniffer._guess_quote_and_delimiter(sample_text, None))
+        if not delimiter:
+            delimiter, strip = sniffer._guess_delimiter(
+                sample_text, None)
+        if not delimiter:
+            raise Exception("Detecting delimiter failed")
+        # Detect header
+        has_header = sniffer.has_header(sample_text)
+        # Interpret the detections
+        if quote_char == '':
+            quote_char = None
+        escape_style = None
+        if quote_char and doubling:
+            escape_style = EscapeStyle.doubling
+        # Return a Format
+        return Format(
+            delimiter=delimiter,
+            quote_char=quote_char,
+            escape_style=escape_style,
+            data_start_line=(2 if has_header else None),
+        )
+
+
     def __init__(
             self,
-            comment_char=None,
             delimiter=None,
             quote_char=None,
             escape_char=None,
             escape_style=None,
-            skip_blank_lines=None,
+            comment_char=None,
+            skip_blank_lines=True,
             data_start_line=None,
-            ):
-        """Create a new delimited text file format.
-
-        comment_char: String to use as comment start indicator
+    ):
+        """
+        Create a new delimited text file format
 
         delimiter: String that separates fields in a record
 
@@ -58,15 +87,15 @@ class Format:
         escape_style: How literal quote characters are included in
             fields
 
+        comment_char: String to use as comment start indicator
+
         skip_blank_lines: Whether blank lines are considered records or
             not.
 
         data_start_line: Number of the non-comment line where the data
             starts.  For example, if the file has a header row, this
             should be 2.  The default is 1.
-
         """
-        self._comment_char = comment_char
         self._delimiter = delimiter
         self._quote_char = quote_char
         self._escape_char = escape_char
@@ -75,6 +104,7 @@ class Format:
                               if (isinstance(escape_style, EscapeStyle)
                                   or escape_style is None)
                               else EscapeStyle[escape_style])
+        self._comment_char = comment_char
         self._skip_blank_lines = skip_blank_lines
         # Validate data_start_line
         if not (data_start_line is None
@@ -84,10 +114,9 @@ class Format:
                 'data_start_line: Not an integer >= 1: {}'
                 .format(data_start_line))
         self._data_start_line = data_start_line
-
-    @property
-    def comment_char(self):
-        return self._comment_char
+        # Validate format
+        if not self.is_valid():
+            raise ValueError('Invalid format: {!r}'.format(self))
 
     @property
     def delimiter(self):
@@ -106,6 +135,10 @@ class Format:
         return self._escape_style
 
     @property
+    def comment_char(self):
+        return self._comment_char
+
+    @property
     def skip_blank_lines(self):
         return self._skip_blank_lines
 
@@ -117,19 +150,20 @@ class Format:
 
     def as_dict(self):
         return collections.OrderedDict((
-            ('comment_char', self._comment_char),
-            ('delimiter', self._delimiter),
-            ('quote_char', self._quote_char),
-            ('escape_char', self._escape_char),
-            ('escape_style', self._escape_style),
-            ('skip_blank_lines', self._skip_blank_lines),
-            ('data_start_line', self._data_start_line),
-            ))
+            ('delimiter', self.delimiter),
+            ('quote_char', self.quote_char),
+            ('escape_char', self.escape_char),
+            ('escape_style', self.escape_style),
+            ('comment_char', self.comment_char),
+            ('skip_blank_lines', self.skip_blank_lines),
+            ('data_start_line', self.data_start_line),
+        ))
 
     def as_yaml_object(self):
         _dict = self.as_dict()
         # Replace non-YAML values with strings
-        _dict['escape_style'] = _dict['escape_style'].name
+        if _dict['escape_style'] is not None:
+            _dict['escape_style'] = _dict['escape_style'].name
         return _dict
 
     def __repr__(self):
@@ -139,23 +173,66 @@ class Format:
         return '{}({})'.format(general.fq_typename(self), ', '.join(fields))
 
     def is_valid(self):
-        """Whether this Format is fully specified enough for parsing."""
-        return (self._delimiter is not None
-                and self._quote_char is not None
-                and self._escape_char is not None
-                and self._escape_style is not None)
+        """
+        Whether this Format is consistent and valid for parsing
+
+        A valid format must define at least the delimiter.  Beyond that,
+        quoting and escaping can take various forms: literal (no quoting
+        and no escaping), only escaping, only quoting (possibly with
+        doubling for escaping), or both quoting and escaping.  Quoting
+        without escaping is uncommon (e.g. single-quoted strings in
+        Bash), and so is supported mainly as a technical point.
+        """
+        return (
+            # Must specify delimiter no matter what
+            self._delimiter is not None and
+            (
+                # Literal (no quoting and no escaping)
+                (self._quote_char is None and
+                 self._escape_char is None and
+                 self._escape_style is None)
+                or
+                # Only escaping
+                (self._quote_char is None and
+                 self._escape_char is not None and
+                 self._escape_style == EscapeStyle.escaping)
+                or
+                # Only quoting or quoting with doubled escaping
+                (self._quote_char is not None and
+                 self._escape_char is None and
+                 self._escape_style != EscapeStyle.escaping)
+                or
+                # Quoting with an escape character
+                (self._quote_char is not None and
+                 self._escape_char is not None and
+                 self._escape_style == EscapeStyle.escaping)
+            )
+        )
 
     def derive(self, **kwargs):
-        """Return a new Format derived from this format.
+        """
+        Return a new Format derived from this format
 
         Creates a new Format with the same values as this format, except
         as overridden in `kwargs`.  Any of the Format constructor
         arguments are valid here.
-
         """
         new_fields = self.as_dict()
         new_fields.update(kwargs)
         return Format(**new_fields)
+
+    def csv_dialect(self):
+        class dialect(csv.Dialect):
+            delimiter = self.delimiter
+            quotechar = self.quote_char
+            escapechar = self.escape_char
+            doublequote = self.escape_style is EscapeStyle.doubling
+            quoting = (csv.QUOTE_MINIMAL
+                       if self.quote_char
+                       else csv.QUOTE_NONE)
+            skipinitialspace = True
+            lineterminator = '\n'
+        return dialect
 
 
 # Common formats
@@ -164,26 +241,25 @@ class Format:
 Format.EXCEL_CSV = Format(
     delimiter=',',
     quote_char='"',
-    escape_char='\\',
     escape_style='doubling',
-    )
+)
 
 """Analog of csv.excel_tab"""
 Format.EXCEL_TAB = Format.EXCEL_CSV.derive(delimiter='\t')
 
-"""Programming language style CSV: commas, quoting with double quotes
+"""
+Programming language style CSV: commas, quoting with double quotes
 only as needed, escaping with backslash not doubling, octothorpe
 comments, whitespace insensitive.
-
 """
 Format.PROGRAMMING_CSV = Format(
-    comment_char='#',
     delimiter=',',
     quote_char='"',
     escape_char='\\',
     escape_style='escaping',
+    comment_char='#',
     skip_blank_lines=True,
-    )
+)
 
 
 class File:
@@ -197,7 +273,7 @@ class File:
             name=None,
             header=None,
             fingerprint=None,
-            ):
+    ):
         self._path = files.new(path)
         self._name = name if name is not None else self._path.stem
         self._format = format
@@ -233,40 +309,24 @@ class File:
             name=self.name,
             header=self.header,
             is_missing=is_missing,
-            )
+        )
 
-    def init_from_file(self, what='all', sample_size=1048576): # TODO split into reusable pieces
+    def init_from_file(self, what='all', sample_size=(2 ** 20)): # TODO split into reusable pieces
         logger = logging.getLogger(general.fq_typename(self))
         logger.info('Detecting format and header of: {}', self.path)
         # Interpret `what` # TODO
         # Read the first part of the file to use as a sample
         with self.path.open('rt') as csv_file:
             sample = csv_file.read(sample_size)
-        # Analyze the sample to determine delimiter and header
-        dialect = csv.excel # Default to Excel format
-        has_header = False
-        sniffer = csv.Sniffer()
-        try:
-            dialect = sniffer.sniff(sample)
-            has_header = sniffer.has_header(sample)
-        except:
-            pass
-        csv_reader = csv.reader(io.StringIO(sample), dialect=dialect)
-        row = next(csv_reader, None)
         # Build format
         if what in ('all', 'format') or 'format' in what:
-            self._format = Format(
-                comment_char=None,
-                delimiter=dialect.delimiter,
-                quote_char=dialect.quotechar,
-                escape_char=dialect.escapechar,
-                escape_style=(EscapeStyle.doubling
-                              if dialect.doublequote
-                              else EscapeStyle.escaping),
-                skip_blank_lines=True,
-                data_start_line=(2 if has_header else None),
-                )
+            # Detect format
+            self._format = Format.detect(sample)
         # Build header
+        csv_reader = csv.reader(
+            io.StringIO(sample), dialect=self._format.csv_dialect())
+        row = next(csv_reader, None)
+        has_header = self._format.data_start_line > 1
         if ((what in ('all', 'header') or 'header' in what)
                 and row is not None):
             # Get header names from the first row or just use Xs
@@ -314,7 +374,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
             header=None,
             is_missing=None,
             error_handler=None,
-            ):
+    ):
         self._path = files.new(path)
         self._name = name if name is not None else self._path.stem
         self._format = format
@@ -328,7 +388,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
             provenance=self._path,
             error_handler=error_handler,
             is_reiterable=True,
-            )
+        )
 
     @property
     def path(self):
@@ -371,14 +431,7 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
             )
         # Create CSV reader
         csv_reader = csv.reader(
-            reader,
-            delimiter=self._format.delimiter,
-            quotechar=self._format.quote_char,
-            escapechar=self._format.escape_char,
-            doublequote=(
-                self._format.escape_style == EscapeStyle.doubling),
-            skipinitialspace=True,
-            )
+            reader, dialect=self._format.csv_dialect())
         # Set up field parsing
         parsers = [_types2parsers.get(typ, None)
                    for typ in self.header.types()]
@@ -444,4 +497,4 @@ _types2parsers = {
     float: lambda text: parse.float(text, text),
     object: parse_literal,
     str: None,
-    }
+}
