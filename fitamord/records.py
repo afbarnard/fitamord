@@ -191,13 +191,15 @@ class RecordStream:
 
     def __init__(
             self, records, name=None, header=None, provenance=None,
-            error_handler=None, is_reiterable=False):
+            error_handler=None, is_reiterable=None):
         self._records = records
         self._name = name
         self._header = header
         self._provenance = provenance
         self._error_handler = error_handler
-        self._is_reiterable = is_reiterable
+        self._is_reiterable = (isinstance(records, (list, tuple))
+                               if is_reiterable is None
+                               else is_reiterable)
 
     def has_name(self):
         return self._name is not None
