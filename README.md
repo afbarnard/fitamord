@@ -40,8 +40,9 @@ MIT License, contained in the file `LICENSE.txt`.
 Requirements
 ------------
 
-* Python >= 3.4
-* PyYaml >= 3.11
+* Python ~= 3.4
+* PyYaml ~= 3.11
+* [Barnapy](https://github.com/afbarnard/barnapy) ~= 0.0
 
 
 Download, Install
@@ -80,7 +81,8 @@ For more information, read the [Pip documentation](https://pip.pypa.io).
 
 ### Quick and Easy ###
 
-1. Download and install.  Fitamord depends on Barnapy so install it too.
+1. Download and install.  Fitamord depends on
+   [Barnapy](https://github.com/afbarnard/barnapy) so install it too.
 
        python3 -m pip install --user git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
 
