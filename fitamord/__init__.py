@@ -27,7 +27,7 @@ the MIT License.  See `LICENSE.txt` for details.
 
 
 # Version
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 
 # Bring in core classes related to records and tables

@@ -142,7 +142,7 @@ class MergeCollect(Relations):
         return relation, key
 
     def merge_collect(self):
-        """Silently skips any records whose key is None"""
+        """Silently skips any records whose key is None""" # TODO discard bad records instead?
         # Get the initial key-group pairs
         keys_groups = [next(gb, None) for gb in self._groupbys]
         # Increment until all the keys are not None (discard groups with

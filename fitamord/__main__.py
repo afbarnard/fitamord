@@ -4,6 +4,9 @@
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
+# TODO convert to script (running this module as main prevents debugging with `-m pdb`)
+
+
 import collections
 import itertools as itools
 import sys

@@ -232,7 +232,7 @@ class RecordStream:
         """Iterates over records using self's error handler."""
         return self.records(self._error_handler)
 
-    def records(self, error_handler=None):
+    def records(self, error_handler=None): # TODO overhaul handling of errors and bad records in general by only attaching error handlers to adding or reading records
         """Iterates over records with optional error handling.
 
         Each error is handled separately by calling the given error
