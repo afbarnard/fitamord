@@ -40,8 +40,8 @@ MIT License, contained in the file `LICENSE.txt`.
 Requirements
 ------------
 
-* Python ~= 3.4
-* PyYaml ~= 3.11
+* [Python](https://www.python.org/) ~= 3.4
+* [PyYaml](https://github.com/yaml/pyyaml) ~= 3.11
 * [Barnapy](https://github.com/afbarnard/barnapy) ~= 0.0
 
 
