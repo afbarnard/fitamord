@@ -51,13 +51,6 @@ setuptools.setup(
     # Requirements
     python_requires='~= 3.4',
     install_requires=[
-        # Do not include scikit-learn as a prerequisite because it
-        # installs well with `pip` only if NumPy and SciPy are already
-        # installed.  Therefore attempting an install is unpredictable
-        # and may lead to attempting to build everything from scratch,
-        # which is definitely not desired.
-
-        #'scikit-learn ~= 0.17',
         'PyYAML ~= 3.11',
         'barnapy ~= 0.0',
     ],
