@@ -10,8 +10,8 @@ from . import general
 
 
 class NamedItems:
-    """An ordered collection of items that are accessible by name or index.
-
+    """
+    An ordered collection of items that are accessible by name or index.
     """
 
     def __init__(
@@ -32,12 +32,24 @@ class NamedItems:
     def add_named_item(self, named_item):
         self.add(*named_item)
 
-    def add(self, name, item):
-        if name in self._names2idxs:
-            raise ValueError('Duplicate name: {!r}'.format(name))
-        self._names2idxs[name] = len(self._names)
-        self._names.append(name)
-        self._items.append(item)
+    def add(self, name, item=None):
+        """
+        Add (or update) a named item or just add a name.
+
+        Returns (added:bool, prev_item:object).
+        """
+        idx = self._names2idxs.get(name, None)
+        # Add the name and item
+        if idx is None:
+            self._names2idxs[name] = len(self._names)
+            self._names.append(name)
+            self._items.append(item)
+            return True, None
+        # Update the item
+        else:
+            old = self._items[idx]
+            self._items[idx] = item
+            return False, old
 
     def names(self):
         return iter(self._names)

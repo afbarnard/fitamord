@@ -39,6 +39,8 @@ class CollectedRecords(NamedItems):
         super().__init__()
         self._groupby_key = groupby_key
         self._relations = relations
+        for name in relations.names():
+            self.add(name, [])
 
     @property
     def groupby_key(self):
