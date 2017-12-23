@@ -94,6 +94,19 @@ For more information, read the [Pip documentation](https://pip.pypa.io).
 
        python3 -m pip uninstall --yes fitamord barnapy
 
+If you need a specific version of Fitamord (or Barnapy) you can insert
+the version number (or branch name or commit hash) into the URL after an
+`@` and before the `#egg=` like this:
+
+    git+https://github.com/afbarnard/fitamord.git@<version>#egg=fitamord
+
+The tagged versions are on the [releases
+page](https://github.com/afbarnard/fitamord/releases).  If you don't
+specify a version, you implicitly get the `master` branch which is
+usually what you want.  The Pip documentation contains the details on
+the [Git URL
+syntax](https://pip.pypa.io/en/stable/reference/pip_install/#git).
+
 
 ### For Development or Reference ###
 
