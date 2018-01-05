@@ -50,8 +50,8 @@ Download, Install
 
 Note that you may first want to create a virtual environment, a space
 that can have its own versions of Python and packages.  A summary of how
-to do this is below, but [the details are
-here](https://packaging.python.org/installing/#creating-virtual-environments).
+to do this is below, but [the details are here](
+https://packaging.python.org/installing/#creating-virtual-environments).
 The alternative is to install things into your user account (home
 directory).
 
@@ -81,48 +81,49 @@ For more information, read the [Pip documentation](https://pip.pypa.io).
 
 ### Quick and Easy ###
 
-1. Download and install.  Fitamord depends on
-   [Barnapy](https://github.com/afbarnard/barnapy) so install it too.
+1. Download and install.  Fitamord depends on [Barnapy](
+   https://github.com/afbarnard/barnapy) so install it too.
 
-       python3 -m pip install --user git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+       python3 -m pip install --user https://github.com/afbarnard/fitamord/archive/master.zip#egg=fitamord https://github.com/afbarnard/barnapy/archive/master.zip#egg=barnapy
 
 2. Update.
 
-       python3 -m pip install --user --upgrade git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+       python3 -m pip install --user --upgrade https://github.com/afbarnard/fitamord/archive/master.zip#egg=fitamord https://github.com/afbarnard/barnapy/archive/master.zip#egg=barnapy
 
 3. Uninstall.
 
        python3 -m pip uninstall --yes fitamord barnapy
 
-If you need a specific version of Fitamord (or Barnapy) you can insert
-the version number (or branch name or commit hash) into the URL after an
-`@` and before the `#egg=` like this:
+If you need a specific version of Fitamord (or Barnapy) you can replace
+"master" with the name of the tag, branch, or commit, like this:
 
-    git+https://github.com/afbarnard/fitamord.git@<version>#egg=fitamord
+    https://github.com/afbarnard/fitamord/archive/<name>.zip#egg=fitamord
 
-The tagged versions are on the [releases
-page](https://github.com/afbarnard/fitamord/releases).  If you don't
-specify a version, you implicitly get the `master` branch which is
-usually what you want.  The Pip documentation contains the details on
-the [Git URL
-syntax](https://pip.pypa.io/en/stable/reference/pip_install/#git).
+The tagged versions are on the [releases page](
+https://github.com/afbarnard/fitamord/releases).
 
 
 ### For Development or Reference ###
 
 Alternatively, use these instructions if you want access to the Fitamord
 repository (e.g. for reference, debugging, or development) or if you
-want more control.
+want more control.  Note that you must have Git installed for this to
+work.
 
-1. Download and install.  Note the `--editable` option.  This is what
-   tells Pip to download the repository to `src/fitamord`.  (Use the
-   `--src` option to specify a different download location.)
+1. Download and install.  Note the `--editable` option and the Git URL.
+   These are what tell Pip to download the Git repository and save it in
+   `src/fitamord`.  (Use the `--src` option to specify a different
+   download location.)
 
-       python3 -m pip install --user --editable git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+       python3 -m pip install --user --editable git+https://github.com/afbarnard/fitamord.git@master#egg=fitamord git+https://github.com/afbarnard/barnapy.git@master#egg=barnapy
+
+   Again, replace "master" with the name of the tag, branch, or commit
+   you want.  The Pip documentation contains the details of the [Git URL
+   syntax](https://pip.pypa.io/en/stable/reference/pip_install/#git).
 
 2. Update.
 
-       python3 -m pip install --user --upgrade --editable git+https://github.com/afbarnard/fitamord.git#egg=fitamord git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+       python3 -m pip install --user --upgrade --editable git+https://github.com/afbarnard/fitamord.git@master#egg=fitamord git+https://github.com/afbarnard/barnapy.git@master#egg=barnapy
 
 3. Uninstall.
 
