@@ -1,6 +1,6 @@
 """Databases and tables"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -276,7 +276,7 @@ class CompoundName:
         return self._parts[index]
 
     def __hash__(self):
-        return hash(self.name)
+        return hash((type(self), self.name))
 
     def __eq__(self, other):
         return type(self) == type(other) and self.name == other.name

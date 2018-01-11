@@ -1,27 +1,34 @@
 """Core record processing"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
 import collections
 import itertools as itools
 
+from . import datatypes
 from . import general
 from .collections import NamedItems
+
+
+class RecordError(Exception):
+    pass
 
 
 class Field:
     """A (name, type) pair with sauce."""
 
-    def __init__(self, name, typ=None):
+    def __init__(self, name, type_=None):
         self._name = name
-        if isinstance(typ, type):
-            self._type = typ
-        elif typ is not None:
-            self._type = type(typ)
+        if isinstance(type_, datatypes.PythonType):
+            self._type = type_
+        elif isinstance(type_, type):
+            self._type = datatypes.PythonType(type_)
+        elif type_ is not None:
+            self._type = type(type_)
         else:
-            self._type = object
+            self._type = datatypes.PythonType(object)
 
     @staticmethod
     def make_from(field):
@@ -58,15 +65,19 @@ class Field:
         return self._type
 
     @property
-    def typename(self):
-        return self.type.__name__
+    def pytype(self):
+        return self.type.type
 
     def isinstance(self, obj):
-        return isinstance(obj, self._type)
+        return self.type.isinstance(obj)
+
+    def __str__(self):
+        return '{}({!r}, {})'.format(
+            type(self).__qualname__, self.name, self.type)
 
     def __repr__(self):
-        return '{}(name={!r}, typ={})'.format(
-            general.fq_typename(self), self.name, self.typename)
+        return '{}({!r}, {!r})'.format(
+            type(self).__qualname__, self.name, self.type)
 
     def __eq__(self, other):
         return (type(self) == type(other)
@@ -74,7 +85,7 @@ class Field:
                 and self.type == other.type)
 
     def __hash__(self):
-        return hash((self.name, self.type))
+        return hash((type(self), self.name, self.type))
 
 
 class Header(NamedItems):
@@ -146,6 +157,12 @@ class Header(NamedItems):
             return False
         return True
 
+    def __str__(self):
+        return ('{}({})'.format(
+            type(self).__qualname__,
+            ', '.join('{}: {}'.format(f.name, f.type)
+                      for f in self.fields())))
+
     def __repr__(self):
         return ('{}({})'.format(
             general.fq_typename(self),
@@ -173,7 +190,7 @@ class Header(NamedItems):
 
     def as_yaml_object(self):
         return collections.OrderedDict(
-            (f.name, f.typename) for f in self.fields())
+            (f.name, f.type.as_yaml_object()) for f in self.fields())
 
 
 class Record:
@@ -242,10 +259,11 @@ class RecordStream:
         is specified, then exceptions are allowed to propagate.
 
         """
-        if error_handler is None:
-            return self._record_iterator()
-        else:
-            return self._record_error_iterator(error_handler)
+        return self._record_iterator()
+        #if error_handler is None:
+        #    return self._record_iterator()
+        #else:
+        #    return self._record_error_iterator(error_handler) # FIXME doesn't work
 
     def _record_iterator(self):
         """Return a plain record iterator without error handling.
@@ -262,7 +280,7 @@ class RecordStream:
         """
         return iter(self._records)
 
-    def _record_error_iterator(self, error_handler=None):
+    def _record_error_iterator(self, error_handler=None): # FIXME doesn't work
         """Return a record iterator with the specified error handling.
 
         If no error handler is specified, exceptions are allowed to
@@ -278,12 +296,24 @@ class RecordStream:
                 record = next(record_iterator)
             except StopIteration:
                 break
-            except Exception as e:
+            except RecordError as e:
                 if error_handler is not None:
-                    error_handler(e, record)
+                    error_handler(e)
                 else:
                     raise e
-            yield record
+            else:
+                yield record
+
+    def __str__(self):
+        return '{}({}, {}, {}, {}, {}, {})'.format(
+            type(self).__qualname__,
+            self._name,
+            self._header,
+            self._provenance,
+            self._error_handler,
+            self._is_reiterable,
+            self._records,
+        )
 
     def __repr__(self):
         return ('{}(name={!r}, header={!r}, provenance={!r}, '

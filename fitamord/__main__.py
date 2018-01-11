@@ -1,6 +1,6 @@
 """Program to transform relational data into feature vectors"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -18,6 +18,7 @@ from . import __version__
 from . import config
 from . import delimited
 from . import features
+from . import general
 from . import relational
 from .engines import sqlite
 
@@ -180,6 +181,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     db = sqlite.SqliteDb(db_file.path) # TODO separate establishing connection from construction to enable context manager
 
     # Load tabular files into DB
+    reader_logger = logging.getLogger(
+        general.fq_typename(delimited.Reader))
     for table_cfg in config_obj.tables:
         # Check if file exists
         table_file = base_directory.join(table_cfg.filename)
@@ -204,8 +207,10 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
                     'Format or header detection failed: {}',
                     table_file)
                 continue
-        # Read delimited file
-        reader = tabular_file.reader(is_missing)
+        # Read delimited file logging all errors
+        reader = tabular_file.reader(
+            is_missing,
+            lambda e: reader_logger.error("'{}': {}", table_file, e))
         # Project (this is pushed down below field parsing)
         if table_cfg.use_columns:
             reader = reader.project(*table_cfg.use_columns)

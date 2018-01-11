@@ -5,7 +5,7 @@ Classes and functions for describing, reading, transforming, and
 otherwise working with tabular data in delimited text files.
 """
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -20,6 +20,7 @@ from barnapy import files
 from barnapy import logging
 from barnapy import parse
 
+from . import datatypes
 from . import file
 from . import general
 from . import records
@@ -262,6 +263,37 @@ Format.PROGRAMMING_CSV = Format(
 )
 
 
+def infer_header(format, sample): # make method of Format?
+    # Read records in sample
+    csv_reader = csv.reader(
+        io.StringIO(sample), dialect=format.csv_dialect())
+    # Detect column names
+    row = next(csv_reader)
+    if format.data_start_line > 1:
+        names = row
+        row = next(csv_reader)
+    else:
+        names = ['x' + str(i + 1) for i in range(len(row))]
+    # Guess types by parsing the first non-header rows
+    col_types = [
+        collections.Counter((type(parse_literal(field)),))
+        for field in row]
+    for row in itools.islice(csv_reader, 100):
+        for col_idx, col_val in enumerate(row):
+            col_type = type(parse_literal(col_val))
+            col_types[col_idx][col_type] += 1
+    # Choose the most common type (except NoneType) as the type.
+    # Default to any parseable atom.  Use a text-aware data types.
+    types = [datatypes.Atom] * len(col_types)
+    for idx, counter in enumerate(col_types):
+        for col_type, frequency in counter.most_common():
+            if col_type != type(None):
+                types[idx] = datatypes.types2datatypes[col_type]
+                break
+    # Build header and return
+    return records.Header(names=names, types=types)
+
+
 class File:
 
     # TODO sort out header in the file from header object created to interpret file
@@ -302,58 +334,30 @@ class File:
     def header(self):
         return self._header
 
-    def reader(self, is_missing=None):
+    def reader(self, is_missing=None, error_handler=None):
         return Reader(
             path=self.path,
             format=self.format,
             name=self.name,
             header=self.header,
             is_missing=is_missing,
+            error_handler=error_handler,
         )
 
-    def init_from_file(self, what='all', sample_size=(2 ** 20)): # TODO split into reusable pieces
+    def init_from_file(self, sample_size=(2 ** 20)):
         logger = logging.getLogger(general.fq_typename(self))
-        logger.info('Detecting format and header of: {}', self.path)
-        # Interpret `what` # TODO
         # Read the first part of the file to use as a sample
+        logger.info('Reading sample from: {}', self.path)
         with self.path.open('rt') as csv_file:
             sample = csv_file.read(sample_size)
-        # Build format
-        if what in ('all', 'format') or 'format' in what:
-            # Detect format
+        # Detect format
+        if self.format is None:
+            logger.info('Detecting format of: {}', self.path)
             self._format = Format.detect(sample)
-        # Build header
-        csv_reader = csv.reader(
-            io.StringIO(sample), dialect=self._format.csv_dialect())
-        row = next(csv_reader, None)
-        has_header = self._format.data_start_line > 1
-        if ((what in ('all', 'header') or 'header' in what)
-                and row is not None):
-            # Get header names from the first row or just use Xs
-            if has_header:
-                names = row
-            else:
-                names = ['x' + str(i + 1) for i in range(len(row))]
-            # Guess types by parsing the first non-header rows
-            if has_header:
-                row = next(csv_reader, None)
-            col_types = [
-                collections.Counter((type(parse_literal(field)),))
-                for field in row]
-            for row in itools.islice(csv_reader, 100):
-                for col_idx, col_val in enumerate(row):
-                    col_type = type(parse_literal(col_val))
-                    col_types[col_idx][col_type] += 1
-            # Choose the most common type (except NoneType) as the type.
-            # Default to object.
-            types = [object] * len(col_types)
-            for idx, counter in enumerate(col_types):
-                for col_type, frequency in counter.most_common():
-                    if col_type != type(None):
-                        types[idx] = col_type
-                        break
-            # Build header
-            self._header = records.Header(names=names, types=types)
+        # Infer header
+        if self.header is None:
+            logger.info('Detecting header of: {}', self.path)
+            self._header = infer_header(self.format, sample)
 
     def __eq__(self, other):
         # For comparing Files constructed from configuration to those
@@ -432,29 +436,42 @@ class Reader(records.RecordStream): # TODO enable to be context manager?
         # Create CSV reader
         csv_reader = csv.reader(
             reader, dialect=self._format.csv_dialect())
+        # Skip to the first data record (to avoid trying to parse the
+        # file header)
+        if self._format.data_start_line:
+            csv_reader = iter(csv_reader)
+            for line_num in range(self._format.data_start_line - 1):
+                next(csv_reader, None)
         # Set up field parsing
-        parsers = [_types2parsers.get(typ, None)
-                   for typ in self.header.types()]
-        # Make record processing loop
-        loop = project_transform_records(
+        parsers = []
+        for typ in self.header.types():
+            if isinstance(typ, datatypes.TextValueType):
+                parsers.append(typ.parse)
+            else:
+                if typ in datatypes.types2datatypes:
+                    parsers.append(datatypes.types2datatypes[typ].parse)
+                else:
+                    parsers.append(None)
+        # Make record processing loop and return
+        return project_transform_records(
             csv_reader,
             parsers,
             self._is_missing,
+            self._error_handler,
             self._inv_projection,
             )
-        # Skip to the first data record (to avoid the file header)
-        if self._format.data_start_line:
-            loop = iter(loop)
-            for line_num in range(self._format.data_start_line - 1):
-                next(loop, None)
-        # Return iterator
-        return loop
 
 
 def project_transform_records(
-        records, transformers, is_missing=None, inv_projection=None):
+        records_,
+        transformers,
+        is_missing=None,
+        error_handler=None,
+        inv_projection=None,
+):
     n_fields = len(transformers)
-    for record in records:
+    for record in records_:
+        err = None
         new_record = [None] * n_fields
         for out_idx in range(n_fields):
             # Find the input index corresponding to the output index
@@ -472,29 +489,34 @@ def project_transform_records(
             transformer = transformers[out_idx]
             if transformer is None:
                 new_record[out_idx] = field
-                continue
-            new_record[out_idx] = transformer(field)
-        yield new_record
+            else:
+                new_field, err = transformer(field)
+                if err is None:
+                    new_record[out_idx] = new_field
+                else:
+                    err = records.RecordError(
+                        'Bad record: {}: {}'.format(record, err))
+                    if error_handler is not None:
+                        error_handler(err)
+                        break
+                    else:
+                        raise err
+        if err is None:
+            yield new_record
 
 
 def parse_literal(text):
     # Short circuit parsing if not text
     if not isinstance(text, str):
         return text
+    # Treat whitespace as None
+    if parse.is_empty(text):
+        return None
     # Try to parse as a common type of literal
-    value, ok = parse.literal(text)
+    value, err = parse.atom_err(text)
     # If successful, return parsed value, otherwise just return the
     # original text
-    if ok:
+    if err is None:
         return value
     else:
         return text
-
-
-_types2parsers = {
-    bool: lambda text: parse.bool(text, text),
-    int: lambda text: parse.int(text, text),
-    float: lambda text: parse.float(text, text),
-    object: parse_literal,
-    str: None,
-}

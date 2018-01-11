@@ -1,6 +1,6 @@
 """SQLite DB engine / backend"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -187,7 +187,7 @@ class SqliteDb(db.Database):
         fields = []
         for field in header:
             field_def = db.quote_name(field.name)
-            field_type = self.translate_type(field.type)
+            field_type = self.translate_type(field.pytype)
             if field_type:
                 field_def += ' ' + field_type
             fields.append(field_def)

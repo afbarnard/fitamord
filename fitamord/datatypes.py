@@ -45,12 +45,45 @@ def parse_time(text, format='%H:%M:%S'):
     return dt, err
 
 
-class TextValueType:
+class PythonType:
+
+    def __init__(self, type_):
+        self._type = type_
+
+    @property
+    def name(self):
+        return self._type.__name__
+
+    @property
+    def type(self):
+        return self._type
+
+    def isinstance(self, obj):
+        return isinstance(obj, self.type)
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return '{}({})'.format(type(self).__qualname__, self.name)
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.type == other.type)
+
+    def __hash__(self):
+        return hash((type(self), self.type))
+
+    def as_yaml_object(self):
+        return str(self)
+
+
+class TextValueType(PythonType):
     """Data types whose values can be represented as textual atoms."""
 
     def __init__(self, name, type_, args, is_repr, parse, format):
+        super().__init__(type_)
         self._name = name
-        self._type = type_
         self._args = args
         self._is_repr = is_repr
         self._parse = parse
@@ -59,13 +92,6 @@ class TextValueType:
     @property
     def name(self):
         return self._name
-
-    @property
-    def type(self):
-        return self._type
-
-    def isinstance(self, obj):
-        return isinstance(obj, self.type)
 
     def isrepr(self, text):
         return self._is_repr(self._args, text)
@@ -80,14 +106,27 @@ class TextValueType:
         return self._format(self._args, obj)
 
     def __str__(self):
-        return self.type.__name__
+        if self._args:
+            return '{}{!r}'.format(self.name, self._args)
+        else:
+            return self.name
 
     def __repr__(self):
-        if self._args:
-            return '{}({}, {!r})'.format(
-                self.name, self.type.__name__, self._args)
-        else:
-            return '{}({})'.format(self.name, self.type.__name__)
+        return '{}({!r}, {}, {!r})'.format(
+            type(self).__qualname__,
+            self.name,
+            self.type.__qualname__,
+            self._args,
+        )
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.name == other.name and
+                self.type == other.type and
+                self._args == other._args)
+
+    def __hash__(self):
+        return hash((type(self), self.name, self.type, self._args))
 
     def derive(self, args):
         return TextValueType(
@@ -178,10 +217,10 @@ DateTime = TextValueType(
 
 
 """
-Recognized lowercase names and aliases mapped to the types they
+Recognized lowercase names and aliases mapped to the data types they
 identify.
 """
-names2types = {
+names2datatypes = {
     'atom': Atom,
     'auto': Atom,
     'object': Atom,
@@ -202,6 +241,9 @@ names2types = {
     'timestamp': DateTime,
 }
 
+"""Python types corresponding to data types."""
+types2datatypes = {dt.type: dt for dt in names2datatypes.values()}
+
 
 def parse(text):
     """
@@ -214,11 +256,11 @@ def parse(text):
         return None, err
     name, args = val
     name_lower = name.lower()
-    if name_lower not in names2types:
+    if name_lower not in names2datatypes:
         return None, DataTypeError(
-            'Unrecognized data type name: {!r} (not in {{{}}})'
-            .format(name, ', '.join(names2types.keys())))
-    datatype = names2types[name_lower]
+            'Unrecognized data type: {!r} (not in {{{}}})'
+            .format(name, ', '.join(names2datatypes.keys())))
+    datatype = names2datatypes[name_lower]
     if args:
         datatype = datatype.derive(args)
     return (datatype, None)

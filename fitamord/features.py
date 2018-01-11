@@ -1,6 +1,6 @@
 """Functionality for generating feature vectors from relational data"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -359,7 +359,7 @@ def make_fact_features(table, key_field=0):
         features.append(Feature(
             table_name=table.name,
             field_name=field.name,
-            data_type=field.type,
+            data_type=field.pytype,
             ))
     return features
 

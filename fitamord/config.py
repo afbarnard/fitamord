@@ -1,6 +1,6 @@
 """Configuration objects"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -13,6 +13,7 @@ from barnapy import parse
 from barnapy import unixutils
 import yaml
 
+from . import datatypes
 from . import delimited
 from . import records
 
@@ -187,7 +188,10 @@ class ConfigError(Exception):
     def __init__(self, message, value=None, *contexts):
         components = [str(c) for c in reversed(contexts)]
         components.append(str(message))
-        if value is not None:
+        if isinstance(value, Exception):
+            components.append(type(value).__qualname__)
+            components.append(str(value))
+        elif value is not None:
             components.append(repr(value))
         msg = ': '.join(components)
         super().__init__(msg)
@@ -299,25 +303,6 @@ class FitamordConfig:
                 None, *self._contexts)
 
 
-_names2types = {
-    'bool': bool,
-    'boolean': bool,
-    'char': str,
-    'date': datetime.date,
-    'datetime': datetime.datetime,
-    'double': float,
-    'float': float,
-    'int': int,
-    'integer': int,
-    'object': object,
-    'real': float,
-    'str': str,
-    'string': str,
-    'time': datetime.time,
-    'varchar': str,
-    }
-
-
 class TabularFileConfig:
 
     treatments = {'facts', 'features', 'events', 'examples'}
@@ -386,15 +371,11 @@ class TabularFileConfig:
                 else:
                     raise ConfigError(
                         'Not a column reference', key, *contexts)
-                # Validate and interpret type name
+                # Convert type name to data type
                 if col_type is not None:
-                    if not isinstance(col_type, str):
-                        raise ConfigError(
-                            'Not a type name', col_type, key, *contexts)
-                    if col_type not in _names2types:
-                        raise ConfigError(
-                            'Unrecognized type', col_type, key, *contexts)
-                col_type = _names2types.get(col_type, None)
+                    col_type, err = datatypes.parse(col_type)
+                    if err is not None:
+                        raise ConfigError(col_name, err, *contexts)
                 col_defs.append((col_idx, col_name, col_type))
                 col_idx += 1
             return tuple(col_defs)
