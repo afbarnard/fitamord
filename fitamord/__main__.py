@@ -69,9 +69,17 @@ def is_valid_event(record):
 
 
 def is_valid_example(record):
-    return (all(record[i] is not None for i in range(4))
-            and type(record[1]) == type(record[2]) # TODO replace with "can type 1 be ordered wrt type 2?"
-            and record[1] <= record[2])
+    # See if "from" is before "upto"
+    is_ordered = record[1] is None or record[2] is None
+    # Both values are given so check their order
+    if not is_ordered:
+        try:
+            is_ordered = record[1] <= record[2]
+        except TypeError as e:
+            is_ordered = False
+    return (record[0] is not None and
+            record[3] is not None and
+            is_ordered)
 
 
 def make_discard_logger(logger, message):

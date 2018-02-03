@@ -267,10 +267,14 @@ class CollectedRecordsView:
         field_idx = self.field_idx_of(table_name, field_name)
         for record in self[table_name]:
             if record[field_idx] == value:
-                if (not is_event_table
-                    or self._start_time
-                       <= record[self._event_time_idx]
-                       <= self._stop_time):
+                if (not is_event_table or
+                    # Satisfies start time (if given)
+                    ((self._start_time is None or
+                      self._start_time <= record[self._event_time_idx])
+                     and
+                     # Satisfies stop time (if given)
+                     (self._stop_time is None or
+                      self._stop_time >= record[self._event_time_idx]))):
                     yield record
 
     def count_values(self, table_name, field_name, value):
