@@ -304,13 +304,11 @@ class File:
             format=None,
             name=None,
             header=None,
-            fingerprint=None,
     ):
         self._path = files.new(path)
         self._name = name if name is not None else self._path.stem
         self._format = format
         self._header = header
-        self._fingerprint = fingerprint
 
     @property
     def path(self):
@@ -325,10 +323,6 @@ class File:
     @property
     def format(self):
         return self._format
-
-    @property
-    def fingerprint(self):
-        return self._fingerprint
 
     @property
     def header(self):
@@ -358,11 +352,6 @@ class File:
         if self.header is None:
             logger.info('Detecting header of: {}', self.path)
             self._header = infer_header(self.format, sample)
-
-    def __eq__(self, other):
-        # For comparing Files constructed from configuration to those
-        # constructed from the file content
-        pass
 
     def __str__(self):
         return str(self._path)

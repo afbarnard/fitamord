@@ -1,12 +1,13 @@
 """File utilities"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
 import collections
 import csv
 import io
+import os
 import pathlib
 import re
 
@@ -17,26 +18,34 @@ from . import records
 
 class Fingerprint:
 
-    def __init__(self):
-        pass
+    @staticmethod
+    def from_path(path):
+        stat = os.stat(path)
+        return Fingerprint(stat.st_size, stat.st_mtime_ns)
 
-    def path(self):
-        return None
+    def __init__(self, size, mtime):
+        self._size = size
+        self._mtime_ns = mtime
 
+    @property
     def size(self):
-        return None
+        return self._size
 
-    def modification_time(self):
-        return None
-
-    def items(self): # Especially for writing to config
-        return ()
-
-    def init_from_file(self):
-        pass
+    @property
+    def mtime_ns(self):
+        return self._mtime_ns
 
     def __eq__(self, other):
-        return False
+        return (type(self) == type(other)
+                and self.size == other.size
+                and self.mtime_ns == other.mtime_ns)
+
+    def __hash__(self):
+        return hash((type(self), self.size, self.mtime_ns))
+
+    def __repr__(self):
+        return '{}(size={!r}, mtime={!r})'.format(
+            type(self).__qualname__, self.size, self.mtime_ns)
 
 
 # Functional file API

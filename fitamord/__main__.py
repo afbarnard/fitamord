@@ -16,9 +16,12 @@ from barnapy import logging
 
 from . import __version__
 from . import config
+from . import db as database # TODO rename module
 from . import delimited
 from . import features
+from . import file
 from . import general
+from . import records
 from . import relational
 from .engines import sqlite
 
@@ -188,10 +191,33 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     db_file = base_directory.join(db_filename)
     db = sqlite.SqliteDb(db_file.path) # TODO separate establishing connection from construction to enable context manager
 
+    # Create, if needed, a table for tracking loading of tables from
+    # delimited files.  A fingerprint consists of the size and
+    # modification time of the file.  The additional items needed are
+    # the header and a flag for whether the table was successfully
+    # loaded.
+    load_dlms_name = '_fitamord_load_dlm'
+    load_dlms = None
+    load_dlms_hdr = records.Header(
+        ('name', str),
+        ('size', int),
+        ('mtime', str), # Use str b/c mtime_ns may overflow 64-bit int
+        ('header', str),
+        ('loaded', int),
+    )
+    if (not db.exists(load_dlms_name) or
+            db.typeof(load_dlms_name) != database.DbObjectType.table):
+        load_dlms = db.make_table(load_dlms_name, load_dlms_hdr)
+    else:
+        load_dlms = db.table(load_dlms_name)
+        # Attach header because parsing header from SQL is not implemented (TODO)
+        load_dlms._header = load_dlms_hdr
+
     # Load tabular files into DB
     reader_logger = logging.getLogger(
         general.fq_typename(delimited.Reader))
     for table_cfg in config_obj.tables:
+        logger.info("Loading '{}'", table_cfg.name)
         # Check if file exists
         table_file = base_directory.join(table_cfg.filename)
         if not table_file.is_readable_file():
@@ -215,6 +241,37 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
                     'Format or header detection failed: {}',
                     table_file)
                 continue
+        # Check if table has already been loaded
+        fingerprint = file.Fingerprint.from_path(tabular_file.path.path)
+        logger.info("File '{}' has fingerprint: {}", tabular_file.path, fingerprint)
+        #rows = load_dlms.select(lambda r: r['name'] == table_cfg.name) # TODO implement predicates as expressions or as functions ("row predicates")
+        rows = list(db.execute_query(
+            'select size, mtime, header, loaded '
+            'from {} where name = ?'.format(load_dlms_name),
+            (tabular_file.name,)))
+        logger.info("DB has loaded '{}': {}", tabular_file.name, rows)
+        if len(rows) > 1:
+            raise Exception('Multiple tables found with name: {}'
+                            .format(tabular_file.name))
+        elif len(rows) == 1:
+            row = rows[0]
+            if (row[0] == fingerprint.size and
+                    row[1] == str(fingerprint.mtime_ns) and
+                    row[2] == str(tabular_file.header) and
+                    row[3] == 1):
+                # Patch in header due to SQLite implementation not setting header (FIXME)
+                table = db.table(table_cfg.name)
+                table._header = tabular_file.header
+                # Skip this table as it has already been loaded
+                logger.info("Skipping '{}': Already loaded", table_cfg.name)
+                continue
+        else:
+            # Create entry to track loading of this table
+            crsr = db.execute_query('insert into {} (name) values (?)'.format(load_dlms_name), (tabular_file.name,))
+            crsr.connection.commit()
+        # Update row for this table
+        crsr = db.execute_query('update {} set size = ?, mtime = ?, header = ?, loaded = ? where name = ?'.format(load_dlms_name), (fingerprint.size, str(fingerprint.mtime_ns), str(tabular_file.header), 0, tabular_file.name))
+        crsr.connection.commit()
         # Read delimited file logging all errors
         reader = tabular_file.reader(
             is_missing,
@@ -231,9 +288,13 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         # Bulk load records from file into table
         table = db.make_table(reader.name, reader.header)
         table.add_all(reader)
+        # Record that the table successfully loaded
+        crsr = db.execute_query('update {} set loaded = ? where name = ?'.format(load_dlms_name), (1, tabular_file.name))
+        crsr.connection.commit()
         logger.info(
-            'Loaded {} records from {} into {}',
+            "Loaded {} records from '{}' into '{}'",
             table.count_rows(), table_file.path, table.name)
+        logger.info("Done loading '{}'", table_cfg.name)
 
     # Above: ahdb.  Below: fitamord.  (Except validation pushed up
     # before data loading as much as possible.)
