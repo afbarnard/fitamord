@@ -16,7 +16,7 @@ from barnapy import logging
 
 from . import __version__
 from . import config
-from . import db as database # TODO rename module
+from . import database
 from . import delimited
 from . import features
 from . import file

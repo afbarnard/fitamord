@@ -10,7 +10,7 @@ import sys
 
 from barnapy import logging
 
-from .. import db
+from .. import database
 from .. import general
 from .. import records as recs
 
@@ -34,7 +34,7 @@ python2sqlite_types = {
     }
 
 
-class SqliteDb(db.Database):
+class SqliteDb(database.Database):
     """Represents a SQLite database and provides schema-level operations"""
 
     def __init__(self, filename=None): # TODO max mem, max threads, other options
@@ -112,7 +112,7 @@ class SqliteDb(db.Database):
         dotted_name = super().interpret_sql_name(name)
         # Check that the dotted name has no more than 2 components
         if len(dotted_name) > 2:
-            raise db.DbSyntaxError(
+            raise database.DbSyntaxError(
                 'Too many name components: {}'.format(name))
         return dotted_name
 
@@ -147,17 +147,17 @@ class SqliteDb(db.Database):
         if types is None:
             parameters = None
             query = self._list_objects_sql.format(
-                db.quote_name(catalog_table_name.name))
+                database.quote_name(catalog_table_name.name))
         elif hasattr(types, '__iter__') and not isinstance(types, str):
             parameters = tuple(
-                db.DbObjectType.convert(o).name for o in types)
+                database.DbObjectType.convert(o).name for o in types)
             query = self._list_objects_with_types_sql.format(
-                db.quote_name(catalog_table_name.name),
+                database.quote_name(catalog_table_name.name),
                 placeholders_for_params(len(parameters)))
         else:
-            parameters = (db.DbObjectType.convert(types).name,)
+            parameters = (database.DbObjectType.convert(types).name,)
             query = self._list_objects_with_types_sql.format(
-                db.quote_name(catalog_table_name.name),
+                database.quote_name(catalog_table_name.name),
                 placeholders_for_params(len(parameters)))
         # Generate the objects as (name, type, sql) tuples
         yield from gen_fetchmany(self.execute_query(query, parameters))
@@ -168,13 +168,13 @@ class SqliteDb(db.Database):
         dotted_name, namespace, obj_name = self._process_name(name)
         catalog_table_name = self._catalog_table_name(namespace)
         query = self._schema_sql.format(
-            db.quote_name(catalog_table_name.name))
+            database.quote_name(catalog_table_name.name))
         schemas = list(
             gen_fetchmany(self.execute_query(query, (obj_name,))))
         if len(schemas) == 0:
-            raise db.DbError('Object not found: {}'.format(name))
+            raise database.DbError('Object not found: {}'.format(name))
         elif len(schemas) > 1:
-            raise db.DbError(
+            raise database.DbError(
                 'Multiple schemas for object: {}'.format(name))
         else:
             return schemas[0][0]
@@ -186,7 +186,7 @@ class SqliteDb(db.Database):
         # Create the fields definition from the header
         fields = []
         for field in header:
-            field_def = db.quote_name(field.name)
+            field_def = database.quote_name(field.name)
             field_type = self.translate_type(field.pytype)
             if field_type:
                 field_def += ' ' + field_type
@@ -194,10 +194,11 @@ class SqliteDb(db.Database):
         fields_def = ', '.join(fields)
         # Build and run the query
         query = self._create_table_sql.format(
-            db.quote_name(name), fields_def)
+            database.quote_name(name), fields_def)
         rows = list(gen_fetchmany(self.execute_query(query)))
         if rows:
-            raise db.DbError('Create returned rows: {}'.format(rows))
+            raise database.DbError(
+                'Create returned rows: {}'.format(rows))
         # Create proxy object
         table = Table(self, dotted_name.name, header)
         self._tables[dotted_name] = table
@@ -210,10 +211,11 @@ class SqliteDb(db.Database):
         if dotted_name in self._tables:
             self._tables[dotted_name].disconnect()
             del self._tables[dotted_name]
-        query = self._drop_table_sql.format(db.quote_name(name))
+        query = self._drop_table_sql.format(database.quote_name(name))
         rows = list(gen_fetchmany(self.execute_query(query)))
         if rows:
-            raise db.DbError('Drop table returned rows: {}'.format(rows))
+            raise database.DbError(
+                'Drop table returned rows: {}'.format(rows))
 
     def table(self, name):
         dotted_name, namespace, obj_name = self._process_name(name)
@@ -241,7 +243,7 @@ class SqliteDb(db.Database):
         self._connection.rollback()
 
 
-class Table(db.Table):
+class Table(database.Table):
 
     # Construction
 
@@ -258,10 +260,11 @@ class Table(db.Table):
 
     def count_rows(self):
         self.assert_connected()
-        query = self._count_rows_sql.format(db.quote_name(self.name))
+        query = self._count_rows_sql.format(
+            database.quote_name(self.name))
         rows = list(gen_fetchmany(self._db.execute_query(query)))
         if len(rows) != 1:
-            raise db.DbError('Not a single row: {}'.format(rows))
+            raise database.DbError('Not a single row: {}'.format(rows))
         n_rows = rows[0][0]
         self._n_rows = n_rows
         return n_rows
@@ -271,16 +274,16 @@ class Table(db.Table):
     def _record_iterator(self): # FIXME semantically incorrect because breaks nesting, but good enough for now
         self.assert_connected()
         # Apply projection
-        cols = (', '.join(db.quote_name(col)
+        cols = (', '.join(database.quote_name(col)
                           for col in self._project_cols)
                 if self._project_cols
                 else '*')
         query = self._select_rows_sql.format(
-            cols, db.quote_name(self.name))
+            cols, database.quote_name(self.name))
         # Apply sorting
         if self._order_by_cols:
             cols = ', '.join(
-                db.quote_name(name) + ' ' + order
+                database.quote_name(name) + ' ' + order
                 for (name, order) in self._order_by_cols)
             query += ' order by ' + cols
         rows = gen_fetchmany(self._db.execute_query(query))
@@ -329,17 +332,19 @@ class Table(db.Table):
                   if isinstance(records, recs.RecordStream)
                   else self.header)
         # Assemble query
-        col_names = '(' + ', '.join(db.quote_name(n)
+        col_names = '(' + ', '.join(database.quote_name(n)
                                     for n in header.names()) + ')'
         param_placeholder = placeholders_for_params(self.n_cols)
         query = self._add_all_sql.format(
-            db.quote_name(self.name), col_names, param_placeholder)
+            database.quote_name(self.name), col_names,
+            param_placeholder)
         # Run query
         cursor = self._db.execute_many(query, records)
         rows = list(gen_fetchmany(cursor))
         if rows:
             self._db.rollback()
-            raise db.DbError('Insert returned rows: {}'.format(rows))
+            raise database.DbError(
+                'Insert returned rows: {}'.format(rows))
         self._db.commit()
         if cursor.rowcount > 0:
             self._n_rows += cursor.rowcount
@@ -348,12 +353,13 @@ class Table(db.Table):
 
     def clear(self):
         self.assert_connected()
-        query = self._clear_sql.format(db.quote_name(self.name))
+        query = self._clear_sql.format(database.quote_name(self.name))
         cursor = self._db.execute_query(query)
         rows = list(gen_fetchmany(cursor))
         if rows:
             self._db.rollback()
-            raise db.DbError('Delete returned rows: {}'.format(rows))
+            raise database.DbError(
+                'Delete returned rows: {}'.format(rows))
         self._db.commit()
         if cursor.rowcount > 0:
             self._n_rows -= cursor.rowcount
@@ -365,7 +371,7 @@ class Table(db.Table):
 
     def assert_connected(self):
         if not self.is_connected():
-            raise db.DbError(
+            raise database.DbError(
                 'Operation not possible because the '
                 'table is not connected to a database.')
 

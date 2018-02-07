@@ -1,4 +1,4 @@
-"""Tests db.py"""
+"""Tests database.py"""
 
 # Copyright (c) 2017 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
@@ -7,7 +7,7 @@
 import string
 import unittest
 
-from .. import db
+from .. import database
 
 
 class IdentifierParseTest(unittest.TestCase):
@@ -50,7 +50,7 @@ class IdentifierParseTest(unittest.TestCase):
 
     def test_match_simple_identifier(self):
         for text, is_valid in IdentifierParseTest._simple_identifiers:
-            match = db._sql_identifier_pattern.fullmatch(text)
+            match = database._sql_identifier_pattern.fullmatch(text)
             if is_valid:
                 self.assertIsNotNone(match)
             else:
@@ -89,7 +89,7 @@ class IdentifierParseTest(unittest.TestCase):
 
     def test_match_compound_identifier(self):
         for text, is_valid in IdentifierParseTest._compound_identifiers:
-            match = db._sql_identifier_pattern.fullmatch(text)
+            match = database._sql_identifier_pattern.fullmatch(text)
             if is_valid:
                 self.assertIsNotNone(match)
             else:
@@ -115,5 +115,5 @@ class IdentifierParseTest(unittest.TestCase):
 
     def test_unquote(self):
         for text, expected in IdentifierParseTest._quote_unquote:
-            actual = db.unquote(text)
+            actual = database.unquote(text)
             self.assertEqual(expected, actual)
