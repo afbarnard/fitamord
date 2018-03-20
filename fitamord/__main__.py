@@ -241,6 +241,11 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
                     'Format or header detection failed: {}',
                     table_file)
                 continue
+        # Project header to create a header for the loaded data.  The
+        # header in the config applies to the tabular file, not
+        # necessarily to the data loaded in the DB, which is projected
+        # through the "use:" config attribute.
+        data_header = tabular_file.header.project(*table_cfg.use_columns)
         # Check if table has already been loaded
         fingerprint = file.Fingerprint.from_path(tabular_file.path.path)
         logger.info("File '{}' has fingerprint: {}", tabular_file.path, fingerprint)
@@ -257,11 +262,11 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
             row = rows[0]
             if (row[0] == fingerprint.size and
                     row[1] == str(fingerprint.mtime_ns) and
-                    row[2] == str(tabular_file.header) and
+                    row[2] == str(data_header) and
                     row[3] == 1):
                 # Patch in header due to SQLite implementation not setting header (FIXME)
                 table = db.table(table_cfg.name)
-                table._header = tabular_file.header
+                table._header = data_header
                 # Skip this table as it has already been loaded
                 logger.info("Skipping '{}': Already loaded", table_cfg.name)
                 continue
@@ -270,7 +275,7 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
             crsr = db.execute_query('insert into {} (name) values (?)'.format(load_dlms_name), (tabular_file.name,))
             crsr.connection.commit()
         # Update row for this table
-        crsr = db.execute_query('update {} set size = ?, mtime = ?, header = ?, loaded = ? where name = ?'.format(load_dlms_name), (fingerprint.size, str(fingerprint.mtime_ns), str(tabular_file.header), 0, tabular_file.name))
+        crsr = db.execute_query('update {} set size = ?, mtime = ?, header = ?, loaded = ? where name = ?'.format(load_dlms_name), (fingerprint.size, str(fingerprint.mtime_ns), str(data_header), 0, tabular_file.name))
         crsr.connection.commit()
         # Read delimited file logging all errors
         reader = tabular_file.reader(
