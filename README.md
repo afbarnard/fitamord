@@ -26,8 +26,8 @@ interpreted as event sequences / timelines.  The type of fact is the
 relation it came from.
 
 * Generic fact (subject_id, fact_type, data)
-* Existence event (subject_id, event_type, time)
-* Value event (subject_id, event_type, time, value)
+* Existence event (subject_id, time, event_type)
+* Value event (subject_id, time, event_type, value)
 
 
 License
