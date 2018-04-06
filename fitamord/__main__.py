@@ -387,6 +387,13 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     logger.info('Writing features to: {}', feats_file)
     features.save(feats, feats_file)
 
+    # Make index of features
+    feats_key2idx = {}
+    for idx, feat in enumerate(feats):
+        key = feat.key
+        assert key not in feats_key2idx
+        feats_key2idx[key] = idx
+
     # TODO end: feature generation
 
     # Record filters with logging discarders # TODO upgrade to add line numbers (from original file) to error messages
@@ -419,7 +426,8 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
 
     # Generate and print all feature vectors
     for feature_vector in barnapy.general.track_iterator(
-            generate_feature_vectors(tables, treats2tables, feats),
+            generate_feature_vectors(
+                tables, treats2tables, feats, feats_key2idx),
             lambda count: logger.info(
                 'Generated feature vectors: {}', count),
             track_every=100,
@@ -436,6 +444,7 @@ def generate_feature_vectors(
         tables,
         treatments2tables,
         feats,
+        feats_key2idx,
         pt_id_idx=_pt_id_idx,
         time_idx=_time_idx,
 ):
@@ -449,7 +458,8 @@ def generate_feature_vectors(
             key=pt_id_idx):
         # Generate feature vectors from this collection of records
         yield from features.generate_feature_vectors(
-            feats, record_collection, treatments2tables, time_idx)
+            feats, feats_key2idx, record_collection,
+            treatments2tables, time_idx)
 
 
 if __name__ == '__main__':
