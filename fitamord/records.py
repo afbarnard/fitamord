@@ -88,6 +88,10 @@ class Field:
         return hash((type(self), self.name, self.type))
 
 
+# TODO allow column name synonyms
+# TODO option for case folding?
+
+
 class Header(NamedItems):
     """A definition of a collection of fields where each field has a name
     and a type.

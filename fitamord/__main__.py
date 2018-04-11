@@ -13,6 +13,7 @@ import sys
 
 from barnapy import files
 from barnapy import logging
+import barnapy.general
 
 from . import __version__
 from . import config
@@ -414,27 +415,39 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         if treatment in filters:
             tables[name] = table.select(filters[treatment])
 
-    # Data tables
-    data_table_names = (treats2tables['facts']
-                        + treats2tables['events']
-                        + treats2tables['examples'])
-
-    # Merge-collect records based on patient ID
-    for record_collection in relational.MergeCollect(
-            *(tables[n] for n in data_table_names),
-            key=_pt_id_idx):
-        # Generate feature vectors from this collection of records
-        for feature_vector in features.generate_feature_vectors(
-                feats, record_collection, treats2tables, _time_idx):
-            label = feature_vector.get(2, 0) # FIXME look up label feature; don't assume numeric values
-            print_as_svmlight(label, feature_vector)
-
-    # TODO blacklists
+    # Generate and print all feature vectors
+    for feature_vector in barnapy.general.track_iterator(
+            generate_feature_vectors(tables, treats2tables, feats),
+            lambda count: logger.info(
+                'Generated feature vectors: {}', count),
+            track_every=100,
+            track_init=True,
+            track_end=True):
+        label = feature_vector.get(2, 0) # FIXME look up label feature; don't assume numeric values
+        print_as_svmlight(label, feature_vector)
 
     # Cleanup # TODO write and use context manager
     db.close()
 
-    # Subsequent: scikit
+
+def generate_feature_vectors(
+        tables,
+        treatments2tables,
+        feats,
+        pt_id_idx=_pt_id_idx,
+        time_idx=_time_idx,
+):
+    # Data tables
+    data_table_names = (treatments2tables['facts']
+                        + treatments2tables['events']
+                        + treatments2tables['examples'])
+    # Merge-collect records based on patient ID
+    for record_collection in relational.MergeCollect(
+            *(tables[n] for n in data_table_names),
+            key=pt_id_idx):
+        # Generate feature vectors from this collection of records
+        yield from features.generate_feature_vectors(
+            feats, record_collection, treatments2tables, time_idx)
 
 
 if __name__ == '__main__':
