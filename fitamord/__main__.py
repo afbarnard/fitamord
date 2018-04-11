@@ -245,7 +245,9 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
         # header in the config applies to the tabular file, not
         # necessarily to the data loaded in the DB, which is projected
         # through the "use:" config attribute.
-        data_header = tabular_file.header.project(*table_cfg.use_columns)
+        data_header = tabular_file.header
+        if table_cfg.use_columns:
+            data_header = data_header.project(*table_cfg.use_columns)
         # Check if table has already been loaded
         fingerprint = file.Fingerprint.from_path(tabular_file.path.path)
         logger.info("File '{}' has fingerprint: {}", tabular_file.path, fingerprint)
