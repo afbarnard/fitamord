@@ -37,10 +37,15 @@ python2sqlite_types = {
 class SqliteDb(database.Database):
     """Represents a SQLite database and provides schema-level operations"""
 
-    def __init__(self, filename=None): # TODO max mem, max threads, other options
+    def __init__( # TODO max mem, max threads, other options
+            self,
+            filename=None,
+            sqlite_array_size=(8 * 2 ** 10), # 8Ki
+    ):
         self._filename = (filename
                           if filename is not None
                           else ':memory:')
+        self._sqlite_array_size = sqlite_array_size
         repr_id = repr(self) + '@' + hex(id(self))
         self._logger = logging.getLogger(repr_id)
         self._logger.info(
@@ -89,6 +94,7 @@ class SqliteDb(database.Database):
             'Executing query: {}; parameters: {}'
             .format(query, parameters))
         cursor = self._connection.cursor()
+        cursor.arraysize = self._sqlite_array_size
         if parameters is None:
             cursor.execute(query)
         else:
@@ -100,6 +106,7 @@ class SqliteDb(database.Database):
             'Executing query: {}; parameters: {}'
             .format(query, parameters))
         cursor = self._connection.cursor()
+        cursor.arraysize = self._sqlite_array_size
         cursor.executemany(query, parameters)
         return cursor
 
