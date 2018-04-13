@@ -69,7 +69,9 @@ def is_valid_fact(record):
 
 
 def is_valid_event(record):
-    return all(record[i] is not None for i in range(3))
+    return (record[0] is not None and
+            record[1] is not None and
+            record[2] is not None)
 
 
 def is_valid_example(record):
