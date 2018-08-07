@@ -1,6 +1,6 @@
 """Fitamord package definition and install configuration"""
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
@@ -53,6 +53,7 @@ setuptools.setup(
     install_requires=[
         'PyYAML ~= 3.11',
         'barnapy ~= 0.0',
+        'esal ~= 0.0',
     ],
 
     # API

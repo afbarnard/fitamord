@@ -458,12 +458,14 @@ def make_get_value(table_name, field_name):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    def get_value(record_collection):
-        values = tuple(record_collection.values(table_name, field_name))
-        if values:
-            return values[0]
-        else:
-            return None
+    #def get_value(record_collection):
+    #    values = tuple(record_collection.values(table_name, field_name))
+    #    if values:
+    #        return values[0]
+    #    else:
+    #        return None
+    def get_value(event_sequence):
+        return (table_name, field_name) # FIXME
     return get_value
 
 
@@ -472,9 +474,12 @@ def make_count_values(table_name, field_name, value):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    def count_values(record_collection):
-        return record_collection.count_values(
-            table_name, field_name, value)
+    #def count_values(record_collection):
+    #    return record_collection.count_values(
+    #        table_name, field_name, value)
+    def count_values(event_sequence):
+        return event_sequence.n_events_of_type(
+            (table_name, field_name, value))
     return count_values
 
 
@@ -483,9 +488,12 @@ def make_value_exists(table_name, field_name, value):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    def value_exists(record_collection):
-        return record_collection.value_exists(
-            table_name, field_name, value)
+    #def value_exists(record_collection):
+    #    return record_collection.value_exists(
+    #        table_name, field_name, value)
+    def value_exists(event_sequence):
+        return event_sequence.has_type(
+            (table_name, field_name, value))
     return value_exists
 
 
@@ -582,3 +590,36 @@ def generate_feature_vectors(
                             # in the feature vector
                             feature_vector[feat_idx + 1] = feat_val
             yield feature_vector
+
+
+def generate_feature_vectors2(event_sequence, examples, features):
+    # Warn and quit if there aren't any examples
+    if not examples:
+        logger = logging.getLogger(__name__)
+        logger.warning('Skipping {}: No example definitions: {!r}',
+                       event_sequence.id,
+                       examples)
+        return
+    # Build a feature vector for each example definition
+    for example_def in examples:
+        # Limit the event records to the window specified in the example
+        # definition
+        _, ex_beg, ex_end, label = example_def
+        es = event_sequence.subsequence(ex_beg, ex_end)
+        # Create the feature vector.  Be efficient by applying only the # TODO
+        # relevant feature functions.
+        feature_vector = {}
+        # Apply each feature function
+        for feat_idx, feat in enumerate(features):
+            feat_val = feat.apply(es)
+            if feat_val is None:
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    'Feature value is None.  Feature {}: {!r};  '
+                    'Example: {!r};  Data: {!r}',
+                    feat_idx, feat, example_def, es)
+            elif feat_val:
+                # Use 1-based indices for the feature index
+                # in the feature vector
+                feature_vector[feat_idx + 1] = feat_val
+        yield feature_vector

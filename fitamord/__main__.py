@@ -14,6 +14,7 @@ import sys
 from barnapy import files
 from barnapy import logging
 import barnapy.general
+import esal
 
 from . import __version__
 from . import config
@@ -100,6 +101,36 @@ def make_record_filter(filter, discard_handler):
             discard_handler(record)
             return False
     return record_filter
+
+
+# Data interpretation
+
+
+def interpret_facts(record_collection, fact_table_names, headers):
+    facts = []
+    for table_name in fact_table_names:
+        for record in record_collection[table_name]:
+            for field_idx, field_name in enumerate(
+                    headers[table_name].names()):
+                facts.append(((table_name, field_name),
+                              record[field_idx]))
+    return facts
+
+
+def interpret_events(record_collection, event_table_names):
+    events = []
+    for table_name in event_table_names:
+        for record in record_collection[table_name]:
+            if len(record) == 3:
+                _, when, what = record
+                value = None
+            elif len(record) == 4:
+                _, when, what, value = record
+            else:
+                raise ValueError('Uninterpretable event record: {!r}'
+                                 .format(record))
+            events.append((when, (table_name, what), value))
+    return events
 
 
 # Input / Output
@@ -450,10 +481,23 @@ def generate_feature_vectors(
     data_table_names = (treatments2tables['facts']
                         + treatments2tables['events']
                         + treatments2tables['examples'])
+    headers = {name: table.header for (name, table) in tables.items()}
     # Merge-collect records based on patient ID
     for record_collection in relational.MergeCollect(
             *(tables[n] for n in data_table_names),
             key=pt_id_idx):
+        import pdb; pdb.set_trace()
+        # Interpret the records
+        facts = interpret_facts(
+            record_collection, treatments2tables['facts'], headers)
+        events = interpret_events(
+            record_collection, treatments2tables['events'])
+        # Create an event sequence
+        event_sequence = esal.EventSequence(
+            (esal.Event(e[1], e[0], e[2]) for e in events),
+            facts,
+            record_collection.groupby_key,
+        )
         # Generate feature vectors from this collection of records
         yield from features.generate_feature_vectors(
             feats, feats_key2idx, record_collection,
