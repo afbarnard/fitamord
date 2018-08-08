@@ -40,9 +40,10 @@ MIT License, contained in the file `LICENSE.txt`.
 Requirements
 ------------
 
-* [Python](https://www.python.org/) ~= 3.4
-* [PyYaml](https://github.com/yaml/pyyaml) ~= 3.11
-* [Barnapy](https://github.com/afbarnard/barnapy) ~= 0.0
+* [Python 3](https://www.python.org/)
+* [PyYaml](https://github.com/yaml/pyyaml)
+* [Barnapy](https://github.com/afbarnard/barnapy)
+* [Esal](https://github.com/afbarnard/esal)
 
 
 Download, Install
@@ -82,20 +83,21 @@ For more information, read the [Pip documentation](https://pip.pypa.io).
 ### Quick and Easy ###
 
 1. Download and install.  Fitamord depends on [Barnapy](
-   https://github.com/afbarnard/barnapy) so install it too.
+   https://github.com/afbarnard/barnapy) and [Esal](
+   https://github.com/afbarnard/esal) so install them too.
 
-       python3 -m pip install --user https://github.com/afbarnard/fitamord/archive/master.zip#egg=fitamord https://github.com/afbarnard/barnapy/archive/master.zip#egg=barnapy
+       python3 -m pip install --user https://github.com/afbarnard/fitamord/archive/master.zip#egg=fitamord https://github.com/afbarnard/barnapy/archive/master.zip#egg=barnapy https://github.com/afbarnard/esal/archive/master.zip#egg=esal
 
 2. Update.
 
-       python3 -m pip install --user --upgrade https://github.com/afbarnard/fitamord/archive/master.zip#egg=fitamord https://github.com/afbarnard/barnapy/archive/master.zip#egg=barnapy
+       python3 -m pip install --user --upgrade https://github.com/afbarnard/fitamord/archive/master.zip#egg=fitamord https://github.com/afbarnard/barnapy/archive/master.zip#egg=barnapy https://github.com/afbarnard/esal/archive/master.zip#egg=esal
 
 3. Uninstall.
 
-       python3 -m pip uninstall --yes fitamord barnapy
+       python3 -m pip uninstall --yes fitamord barnapy esal
 
-If you need a specific version of Fitamord (or Barnapy) you can replace
-"master" with the name of the tag, branch, or commit, like this:
+If you need a specific version of Fitamord (or Barnapy or Esal) you can
+replace "master" with the name of the tag, branch, or commit, like this:
 
     https://github.com/afbarnard/fitamord/archive/<name>.zip#egg=fitamord
 
@@ -115,7 +117,7 @@ work.
    `src/fitamord`.  (Use the `--src` option to specify a different
    download location.)
 
-       python3 -m pip install --user --editable git+https://github.com/afbarnard/fitamord.git@master#egg=fitamord git+https://github.com/afbarnard/barnapy.git@master#egg=barnapy
+       python3 -m pip install --user --editable git+https://github.com/afbarnard/fitamord.git@master#egg=fitamord git+https://github.com/afbarnard/barnapy.git@master#egg=barnapy git+https://github.com/afbarnard/esal.git@master#egg=esal
 
    Again, replace "master" with the name of the tag, branch, or commit
    you want.  The Pip documentation contains the details of the [Git URL
@@ -123,16 +125,16 @@ work.
 
 2. Update.
 
-       python3 -m pip install --user --upgrade --editable git+https://github.com/afbarnard/fitamord.git@master#egg=fitamord git+https://github.com/afbarnard/barnapy.git@master#egg=barnapy
+       python3 -m pip install --user --upgrade --editable git+https://github.com/afbarnard/fitamord.git@master#egg=fitamord git+https://github.com/afbarnard/barnapy.git@master#egg=barnapy git+https://github.com/afbarnard/esal.git@master#egg=esal
 
 3. Uninstall.
 
-       python3 -m pip uninstall --yes fitamord barnapy
+       python3 -m pip uninstall --yes fitamord barnapy esal
 
 For more control you can use Git and Pip directly.
 
     # Install dependencies (or use `requirements.txt`; see below)
-    python3 -m pip install --user git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+    python3 -m pip install --user git+https://github.com/afbarnard/barnapy.git#egg=barnapy git+https://github.com/afbarnard/esal.git@master#egg=esal
     # Download Fitamord to <fitamord-dir> (`fitamord` by default)
     git clone https://github.com/afbarnard/fitamord.git [<fitamord-dir>]
     # Install Fitamord
@@ -142,7 +144,7 @@ For more control you can use Git and Pip directly.
     # Upgrade if the install is not editable
     python3 -m pip install --user --upgrade <fitamord-dir>
     # Uninstall
-    python3 -m pip uninstall --yes fitamord barnapy
+    python3 -m pip uninstall --yes fitamord barnapy esal
     rm -Rf <fitamord-dir>
 
 You can also install Fitamord and its dependencies by telling Pip to use
@@ -271,11 +273,17 @@ vectors.
 
     python3 -m fitamord 1>feature_vector_data.svmlight 2>fitamord.log
 
-The table of features will be in `features.generated.csv`.  Lastly,
-check the log for errors, warnings, and other information.
+The table of features will be in `features.generated.csv`.
+
+Lastly, check the log for errors, warnings, and other information.  In
+particular, if the value of a feature is `None`, it will be ignored, the
+same as when the value is zero.  Equating `None` and zero may lead to
+nonsensical data (e.g. missing age equals 0 age).  In these cases you
+may want to fix your data, for example, by replacing missing values with
+sensible defaults.
 
 
 -----
 
-Copyright (c) 2017 Aubrey Barnard.  This is free software released under
+Copyright (c) 2018 Aubrey Barnard.  This is free software released under
 the MIT License.  See `LICENSE.txt` for details.

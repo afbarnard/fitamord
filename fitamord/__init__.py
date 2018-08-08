@@ -26,4 +26,4 @@ the MIT License.  See `LICENSE.txt` for details.
 
 
 # Version
-__version__ = '0.3.2'
+__version__ = '0.3.3'
