@@ -477,6 +477,9 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
     # Cleanup # TODO write and use context manager
     db.close()
 
+    # Done
+    logger.info('Done')
+
 
 def generate_feature_vectors(
         tables,
@@ -495,13 +498,19 @@ def generate_feature_vectors(
     for record_collection in relational.MergeCollect(
             *(tables[n] for n in data_table_names),
             key=pt_id_idx):
-        # Interpret the records
+        # Interpret the examples
+        examples = interpret_examples(
+            record_collection, treatments2tables['examples'])
+        # Skip to the next set of records if there aren't examples.  No
+        # need to print a message as this is like a join with the
+        # examples.
+        if not examples:
+            continue
+        # Interpret the facts and events
         facts = interpret_facts(
             record_collection, treatments2tables['facts'], headers)
         events = interpret_events(
             record_collection, treatments2tables['events'], headers)
-        examples = interpret_examples(
-            record_collection, treatments2tables['examples'])
         # Generate feature vectors from this collection of records
         yield from features.generate_feature_vectors2(
             record_collection.groupby_key,

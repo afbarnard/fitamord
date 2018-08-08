@@ -620,12 +620,6 @@ def apply_feature(feature_vector, feature_id, feature, event_sequence):
 
 def generate_feature_vectors2(
         id, facts, events, examples, features, features_key2idx):
-    # Warn and quit if there aren't any examples
-    if not examples:
-        logger = logging.getLogger(__name__)
-        logger.warning('Skipping {}: No example definitions: {!r}',
-                       id, examples)
-        return
     # Create an event sequence to efficiently answer feature queries
     event_sequence = esal.EventSequence(
         (esal.Event(e[1], e[0], e[2]) for e in events), facts, id)
