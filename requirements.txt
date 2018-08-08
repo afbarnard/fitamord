@@ -1,11 +1,12 @@
 # Requirements for Fitamord to enable easily installing with Pip
 
-# Copyright (c) 2017 Aubrey Barnard.  This is free software released
+# Copyright (c) 2018 Aubrey Barnard.  This is free software released
 # under the MIT License.  See `LICENSE.txt` for details.
 
 
 # Provide a URL from which to get Barnapy
 git+https://github.com/afbarnard/barnapy.git#egg=barnapy
+git+https://github.com/afbarnard/esal.git#egg=esal
 
 # Install Fitamord to make the application available
 .
