@@ -167,7 +167,7 @@ class SqliteDb(database.Database):
                 database.quote_name(catalog_table_name.name),
                 placeholders_for_params(len(parameters)))
         # Generate the objects as (name, type, sql) tuples
-        yield from gen_fetchmany(self.execute_query(query, parameters))
+        return gen_fetchmany(self.execute_query(query, parameters))
 
     _schema_sql = 'select sql from {} where name = ?'
 
