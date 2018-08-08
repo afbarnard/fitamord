@@ -654,8 +654,9 @@ def generate_feature_vectors2(
         # Apply features to events
         for ev_type in es.types():
             # Lookup the feature by (table, field, value), which is the
-            # event type
-            feat_idx = lookup_feature(features_key2idx, ev_type)
+            # event type, or by (table, field)
+            feat_idx = lookup_feature(
+                features_key2idx, ev_type, ev_type[:2])
             if feat_idx is not None:
                 apply_feature(feature_vector,
                               # External feature ID is 1-based index
