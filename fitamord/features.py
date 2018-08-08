@@ -18,6 +18,7 @@
 
 
 from enum import Enum
+import io
 
 from barnapy import files
 from barnapy import logging
@@ -595,7 +596,30 @@ def generate_feature_vectors(
             yield feature_vector
 
 
-def generate_feature_vectors2(id, facts, events, examples, features):
+def lookup_feature(features_key2idx, *keys):
+    for key in keys:
+        feat_idx = features_key2idx.get(key)
+        if feat_idx is not None:
+            return feat_idx
+    return None
+
+
+def apply_feature(feature_vector, feature_id, feature, event_sequence):
+    feat_val = feature.apply(event_sequence)
+    # Warn about bad feature values
+    if feat_val is None:
+        logger = logging.getLogger(__name__)
+        strio = io.StringIO()
+        event_sequence.pprint(margin=2, file=strio)
+        logger.warning('Value of feature {} is `None`: {!r}\n{}',
+                       feature_id, feature, strio.getvalue())
+    # Only record the value if it is nonzero
+    elif feat_val:
+        feature_vector[feature_id] = feat_val
+
+
+def generate_feature_vectors2(
+        id, facts, events, examples, features, features_key2idx):
     # Warn and quit if there aren't any examples
     if not examples:
         logger = logging.getLogger(__name__)
@@ -614,20 +638,26 @@ def generate_feature_vectors2(id, facts, events, examples, features):
         # Set the special attributes as facts
         es[_spcl_attrs_tbl_nm, 'id'] = id
         es[_spcl_attrs_tbl_nm, 'label'] = label
-        # Create the feature vector.  Be efficient by applying only the # TODO
+        # Create the feature vector.  Be efficient by applying only the
         # relevant feature functions.
         feature_vector = {}
-        # Apply each feature function
-        for feat_idx, feat in enumerate(features):
-            feat_val = feat.apply(es)
-            if feat_val is None:
-                logger = logging.getLogger(__name__)
-                logger.info(
-                    'Feature value is None.  Feature {}: {!r};  '
-                    'Example: {!r};  Data: {!r}',
-                    feat_idx, feat, example_def, es)
-            elif feat_val:
-                # Use 1-based indices for the feature index in the
-                # feature vector
-                feature_vector[feat_idx + 1] = feat_val
+        # Apply features to facts
+        for key, val in es.facts():
+            # Lookup the feature either by (table, field, value) or by
+            # (table, field).  (`key` is (table, field).)
+            feat_idx = lookup_feature(
+                features_key2idx, (*key, val), key)
+            if feat_idx is not None:
+                apply_feature(feature_vector,
+                              # External feature ID is 1-based index
+                              feat_idx + 1, features[feat_idx], es)
+        # Apply features to events
+        for ev_type in es.types():
+            # Lookup the feature by (table, field, value), which is the
+            # event type
+            feat_idx = lookup_feature(features_key2idx, ev_type)
+            if feat_idx is not None:
+                apply_feature(feature_vector,
+                              # External feature ID is 1-based index
+                              feat_idx + 1, features[feat_idx], es)
         yield feature_vector

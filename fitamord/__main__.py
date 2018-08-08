@@ -483,8 +483,8 @@ def generate_feature_vectors(
         treatments2tables,
         feats,
         feats_key2idx,
-        pt_id_idx=_pt_id_idx,
-        time_idx=_time_idx,
+        pt_id_idx=_pt_id_idx, # TODO ensure used
+        time_idx=_time_idx, # TODO ensure used
 ):
     # Data tables
     data_table_names = (treatments2tables['facts']
@@ -504,8 +504,12 @@ def generate_feature_vectors(
             record_collection, treatments2tables['examples'])
         # Generate feature vectors from this collection of records
         yield from features.generate_feature_vectors2(
-            record_collection.groupby_key, facts, events, examples,
-            feats)
+            record_collection.groupby_key,
+            facts,
+            events,
+            examples,
+            feats,
+            feats_key2idx)
 
 
 if __name__ == '__main__':
