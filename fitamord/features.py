@@ -21,6 +21,7 @@ from enum import Enum
 
 from barnapy import files
 from barnapy import logging
+import esal
 
 from . import general
 from . import records
@@ -178,8 +179,8 @@ class Feature: # TODO rework to separate out random variable aspects from associ
             return self._data_to_rv_types[self._data_type]
         return RandomVariableType.categorical
 
-    def apply(self, record_collection):
-        value = self._function(record_collection)
+    def apply(self, thing):
+        value = self._function(thing)
         if value is not None and self.data_type not in (None, object):
             value = self.data_type(value)
         return value
@@ -373,7 +374,8 @@ def detect(
     # Encode categorical features as numeric if requested
     if numeric_features:
         fact_features = encode_categorical_features(
-            fact_features, names2tables, rv_type, numeric_features)
+            fact_features, names2tables,
+            numeric_features=numeric_features)
     return fact_features + event_features
 
 
@@ -441,7 +443,7 @@ def encode_categorical_features(
                 table_name=feature.table_name,
                 field_name=feature.field_name,
                 value=value,
-                rv_type=rv_type,
+                rv_type=rv_type, # TODO why is this not always binary?
                 data_type=(int
                            if rv_type == RandomVariableType.count
                                or numeric_features
@@ -458,12 +460,14 @@ def make_get_value(table_name, field_name):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    def get_value(record_collection):
-        values = tuple(record_collection.values(table_name, field_name))
-        if values:
-            return values[0]
-        else:
-            return None
+    #def get_value(record_collection):
+    #    values = tuple(record_collection.values(table_name, field_name))
+    #    if values:
+    #        return values[0]
+    #    else:
+    #        return None
+    def get_value(event_sequence):
+        return event_sequence.fact((table_name, field_name))
     return get_value
 
 
@@ -472,9 +476,12 @@ def make_count_values(table_name, field_name, value):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    def count_values(record_collection):
-        return record_collection.count_values(
-            table_name, field_name, value)
+    #def count_values(record_collection):
+    #    return record_collection.count_values(
+    #        table_name, field_name, value)
+    def count_values(event_sequence):
+        return event_sequence.n_events_of_type(
+            (table_name, field_name, value))
     return count_values
 
 
@@ -483,9 +490,13 @@ def make_value_exists(table_name, field_name, value):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    def value_exists(record_collection):
-        return record_collection.value_exists(
-            table_name, field_name, value)
+    #def value_exists(record_collection):
+    #    return record_collection.value_exists(
+    #        table_name, field_name, value)
+    def value_exists(event_sequence):
+        return (
+            event_sequence.fact((table_name, field_name)) == value or
+            event_sequence.has_type((table_name, field_name, value)))
     return value_exists
 
 
@@ -582,3 +593,41 @@ def generate_feature_vectors(
                             # in the feature vector
                             feature_vector[feat_idx + 1] = feat_val
             yield feature_vector
+
+
+def generate_feature_vectors2(id, facts, events, examples, features):
+    # Warn and quit if there aren't any examples
+    if not examples:
+        logger = logging.getLogger(__name__)
+        logger.warning('Skipping {}: No example definitions: {!r}',
+                       id, examples)
+        return
+    # Create an event sequence to efficiently answer feature queries
+    event_sequence = esal.EventSequence(
+        (esal.Event(e[1], e[0], e[2]) for e in events), facts, id)
+    # Build a feature vector for each example definition
+    for example_def in examples:
+        # Limit the event records to the window specified in the example
+        # definition
+        id, ex_beg, ex_end, label = example_def
+        es = event_sequence.subsequence(ex_beg, ex_end)
+        # Set the special attributes as facts
+        es[_spcl_attrs_tbl_nm, 'id'] = id
+        es[_spcl_attrs_tbl_nm, 'label'] = label
+        # Create the feature vector.  Be efficient by applying only the # TODO
+        # relevant feature functions.
+        feature_vector = {}
+        # Apply each feature function
+        for feat_idx, feat in enumerate(features):
+            feat_val = feat.apply(es)
+            if feat_val is None:
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    'Feature value is None.  Feature {}: {!r};  '
+                    'Example: {!r};  Data: {!r}',
+                    feat_idx, feat, example_def, es)
+            elif feat_val:
+                # Use 1-based indices for the feature index in the
+                # feature vector
+                feature_vector[feat_idx + 1] = feat_val
+        yield feature_vector

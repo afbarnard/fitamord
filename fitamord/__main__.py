@@ -104,6 +104,44 @@ def make_record_filter(filter, discard_handler):
     return record_filter
 
 
+# Data interpretation
+
+
+def interpret_facts(record_collection, fact_table_names, headers):
+    facts = []
+    for table_name in fact_table_names:
+        for record in record_collection[table_name]:
+            for field_idx, field_name in enumerate(
+                    headers[table_name].names()):
+                facts.append(((table_name, field_name),
+                              record[field_idx]))
+    return facts
+
+
+def interpret_events(record_collection, event_table_names, headers):
+    events = []
+    for table_name in event_table_names:
+        field_name = headers[table_name].name_at(2)
+        for record in record_collection[table_name]:
+            if len(record) == 3:
+                _, when, what = record
+                value = None
+            elif len(record) == 4:
+                _, when, what, value = record
+            else:
+                raise ValueError('Uninterpretable event record: {!r}'
+                                 .format(record))
+            events.append((when, (table_name, field_name, what), value))
+    return events
+
+
+def interpret_examples(record_collection, example_table_names):
+    examples = []
+    for table_name in example_table_names:
+        examples.extend(record_collection[table_name])
+    return examples
+
+
 # Input / Output
 
 
@@ -452,14 +490,22 @@ def generate_feature_vectors(
     data_table_names = (treatments2tables['facts']
                         + treatments2tables['events']
                         + treatments2tables['examples'])
+    headers = {name: table.header for (name, table) in tables.items()}
     # Merge-collect records based on patient ID
     for record_collection in relational.MergeCollect(
             *(tables[n] for n in data_table_names),
             key=pt_id_idx):
+        # Interpret the records
+        facts = interpret_facts(
+            record_collection, treatments2tables['facts'], headers)
+        events = interpret_events(
+            record_collection, treatments2tables['events'], headers)
+        examples = interpret_examples(
+            record_collection, treatments2tables['examples'])
         # Generate feature vectors from this collection of records
-        yield from features.generate_feature_vectors(
-            feats, feats_key2idx, record_collection,
-            treatments2tables, time_idx)
+        yield from features.generate_feature_vectors2(
+            record_collection.groupby_key, facts, events, examples,
+            feats)
 
 
 if __name__ == '__main__':
