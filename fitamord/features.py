@@ -209,114 +209,6 @@ class Feature: # TODO rework to separate out random variable aspects from associ
 _spcl_attrs_tbl_nm = '_special_attrs'
 
 
-class CollectedRecordsView:
-    """The object on which feature functions are defined"""
-
-    _field_idx_cache = {}
-
-    def __init__(
-            self,
-            record_collection,
-            event_table_names,
-            example_table_names,
-            event_time_idx,
-            ):
-        self._record_collection = record_collection
-        self._event_table_names = set(event_table_names)
-        self._example_table_names = example_table_names
-        self._event_time_idx = event_time_idx
-        # Fake the special attributes until I come up with a better way # FIXME
-        if _spcl_attrs_tbl_nm not in self._record_collection.relations:
-            self._record_collection.relations.add(records.RecordStream(
-                records=(),
-                name=_spcl_attrs_tbl_nm,
-                header=records.Header(('id', int), ('label', str)),
-                ))
-        self._record_collection.add(_spcl_attrs_tbl_nm, None)
-
-    def set_example_definition(self, example_definition): # TODO validate example def
-        _, start, stop, label = example_definition
-        self._start_time = start
-        self._stop_time = stop
-        self._label = label
-        self._record_collection[_spcl_attrs_tbl_nm] = [(self.id, label)]
-
-    @property
-    def id(self):
-        return self._record_collection.groupby_key
-
-    @property
-    def label(self):
-        return self._label
-
-    def table_names(self):
-        return self._record_collection.names()
-
-    def __getitem__(self, idx):
-        if isinstance(idx, int):
-            table_name = self._record_collection.name_at(idx)
-        else:
-            table_name = idx
-        # Filter events but not facts
-        if table_name in self._event_table_names:
-            for record in self._record_collection[idx]:
-                # Check if the record falls within the time limits of
-                # the example definition
-                if (
-                        # Satisfies start time (if given)
-                        (self._start_time is None or
-                         self._start_time <=
-                             record[self._event_time_idx])
-                        and
-                        # Satisfies stop time (if given)
-                        (self._stop_time is None or
-                         self._stop_time >=
-                             record[self._event_time_idx])):
-                    yield record
-        else:
-            yield from self._record_collection[idx]
-
-    def field_idx_of(self, table_name, field_name):
-        key = (table_name, field_name)
-        if key not in self._field_idx_cache:
-            self._field_idx_cache[key] = (
-                self._record_collection.relations[table_name]
-                .header.index_of(field_name))
-        return self._field_idx_cache[key]
-
-    def values(self, table_name, field_name):
-        field_idx = self.field_idx_of(table_name, field_name)
-        for record in self[table_name]:
-            yield record[field_idx]
-
-    def select_records_by_value(self, table_name, field_name, value):
-        field_idx = self.field_idx_of(table_name, field_name)
-        for record in self[table_name]:
-            if record[field_idx] == value:
-                yield record
-
-    def count_values(self, table_name, field_name, value):
-        count = 0
-        for record in self.select_records_by_value(
-                table_name, field_name, value):
-            count += 1
-        return count
-
-    def value_exists(self, table_name, field_name, value):
-        for record in self.select_records_by_value(
-                table_name, field_name, value):
-            return True
-        return False
-
-    def __repr__(self):
-        return '{}(start={!r}, stop={!r}, records={!r})'.format(
-            general.fq_typename(self),
-            self._start_time,
-            self._stop_time,
-            [(n, list(self[n])) for n in self.table_names()],
-        )
-
-
 # Loading, saving, detecting features
 
 
@@ -461,12 +353,6 @@ def make_get_value(table_name, field_name):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    #def get_value(record_collection):
-    #    values = tuple(record_collection.values(table_name, field_name))
-    #    if values:
-    #        return values[0]
-    #    else:
-    #        return None
     def get_value(event_sequence):
         return event_sequence.fact((table_name, field_name))
     return get_value
@@ -477,9 +363,6 @@ def make_count_values(table_name, field_name, value):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    #def count_values(record_collection):
-    #    return record_collection.count_values(
-    #        table_name, field_name, value)
     def count_values(event_sequence):
         return event_sequence.n_events_of_type(
             (table_name, field_name, value))
@@ -491,9 +374,6 @@ def make_value_exists(table_name, field_name, value):
         raise ValueError('Bad table name: {!r}'.format(table_name))
     if not isinstance(field_name, str):
         raise ValueError('Bad field name: {!r}'.format(field_name))
-    #def value_exists(record_collection):
-    #    return record_collection.value_exists(
-    #        table_name, field_name, value)
     def value_exists(event_sequence):
         return (
             event_sequence.fact((table_name, field_name)) == value or
@@ -502,98 +382,6 @@ def make_value_exists(table_name, field_name, value):
 
 
 # Feature vectors
-
-
-def generate_feature_vectors(
-        features,
-        features_key2idx,
-        record_collection,
-        treatments2table_names,
-        event_time_idx,
-):
-    # Check that this record collection has examples
-    if not (set(treatments2table_names['examples'])
-            & set(record_collection.names())):
-        logger = logging.getLogger(__name__)
-        logger.warning(
-            'Skipping {}: '
-            'No example definitions in record collection: {!r}',
-            record_collection.groupby_key,
-            record_collection)
-        return
-    # Invert mapping of treatments to table names
-    table_names2treatments = {
-        nm: trt
-        for (trt, nms) in treatments2table_names.items()
-        for nm in nms}
-    # Add special attributes table as a table of facts
-    table_names2treatments[_spcl_attrs_tbl_nm] = 'facts'
-    # Create view of collected records that is suitable for applying
-    # feature functions
-    record_collection_view = CollectedRecordsView(
-        record_collection,
-        treatments2table_names['events'],
-        treatments2table_names['examples'],
-        event_time_idx,
-    )
-    # Generate a feature vector for each of the examples in the record
-    # collection
-    for example_table_name in treatments2table_names['examples']:
-        if example_table_name not in record_collection:
-            continue
-        for example_def in record_collection[example_table_name]:
-            # Limit the event records to the window specified in the
-            # example definition
-            record_collection_view.set_example_definition(example_def)
-            # To create the feature vector, apply feature functions to
-            # the records limited to this example
-            feature_vector = {}
-            for tbl_nm in record_collection_view.table_names():
-                tbl_hdr = record_collection.relations[tbl_nm].header
-                trtmnt = table_names2treatments[tbl_nm]
-                # Skip the example tables
-                if trtmnt == 'examples':
-                    continue
-                # Decide the columns to process
-                elif trtmnt == 'facts':
-                    # Facts: all columns
-                    col_idxs = range(len(tbl_hdr))
-                elif trtmnt == 'events':
-                    # Events: event type column is index 2
-                    col_idxs = (2,)
-                else:
-                    raise ValueError('Unknown table treatment: {!r}'
-                                     .format(trtmnt))
-                # Do the features for each record for each column
-                for record in record_collection_view[tbl_nm]:
-                    for col_idx in col_idxs:
-                        col_nm = tbl_hdr.name_at(col_idx)
-                        rec_val = record[col_idx]
-                        feat_key = (tbl_nm, col_nm, rec_val)
-                        # TODO support hierarchical feature keys
-                        if feat_key in features_key2idx:
-                            feat_idx = features_key2idx[feat_key]
-                        elif feat_key[:2] in features_key2idx:
-                            feat_idx = features_key2idx[feat_key[:2]]
-                        # No matching feature
-                        else:
-                            continue
-                        # Apply the feature
-                        feat = features[feat_idx]
-                        feat_val = feat.apply(record_collection_view)
-                        if feat_val is None:
-                            logger = logging.getLogger(__name__)
-                            logger.info(
-                                'Feature value is None.  '
-                                'Feature {}: {!r};  '
-                                'Example: {!r};  Data: {!r}',
-                                feat_idx, feat, example_def,
-                                record_collection)
-                        elif feat_val:
-                            # Use 1-based indices for the feature index
-                            # in the feature vector
-                            feature_vector[feat_idx + 1] = feat_val
-            yield feature_vector
 
 
 def lookup_feature(features_key2idx, *keys):
@@ -618,7 +406,7 @@ def apply_feature(feature_vector, feature_id, feature, event_sequence):
         feature_vector[feature_id] = feat_val
 
 
-def generate_feature_vectors2(
+def generate_feature_vectors(
         id, facts, events, examples, features, features_key2idx):
     # Create an event sequence to efficiently answer feature queries
     event_sequence = esal.EventSequence(

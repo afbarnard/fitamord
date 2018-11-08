@@ -512,7 +512,7 @@ def generate_feature_vectors(
         events = interpret_events(
             record_collection, treatments2tables['events'], headers)
         # Generate feature vectors from this collection of records
-        yield from features.generate_feature_vectors2(
+        yield from features.generate_feature_vectors(
             record_collection.groupby_key,
             facts,
             events,
