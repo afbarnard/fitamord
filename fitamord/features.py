@@ -622,7 +622,7 @@ def generate_feature_vectors2(
         id, facts, events, examples, features, features_key2idx):
     # Create an event sequence to efficiently answer feature queries
     event_sequence = esal.EventSequence(
-        (esal.Event(e[1], e[0], e[2]) for e in events), facts, id)
+        (esal.Event(e[0], e[1], e[2]) for e in events), facts, id)
     # Build a feature vector for each example definition
     for example_def in examples:
         # Limit the event records to the window specified in the example

@@ -53,7 +53,7 @@ setuptools.setup(
     install_requires=[
         'PyYAML ~= 3.11',
         'barnapy ~= 0.0.8',
-        'esal ~= 0.2.2',
+        'esal ~= 0.3.0',
     ],
 
     # API
