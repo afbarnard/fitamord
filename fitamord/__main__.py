@@ -9,11 +9,13 @@
 
 import collections
 import itertools as itools
+import math
 import sys
 
 from barnapy import files
 from barnapy import logging
 import barnapy.general
+import psutil
 
 from . import __version__
 from . import config
@@ -228,9 +230,30 @@ def main(args=None): # TODO split into outer main that catches and logs exceptio
                   if config_obj.is_missing
                   else None)
 
+    # How much memory to use for DB?
+    mem_info = psutil.virtual_memory()
+    # Display in KiB to agree with `top`
+    logger.info('Memory (KiB):  total: {}, avail: {}',
+                mem_info.total // 1024, mem_info.available // 1024)
+    # Use up to 1/2 of total memory for DB cache but no less than 100
+    # MiB.  Use 1/5 as much for mmap (1/10 overall).
+    max_mem_frac = 1 / 2
+    db_cache_size = max(
+        min(mem_info.total * max_mem_frac, mem_info.available),
+        100 * 2 ** 20)
+    db_mmap_size = db_cache_size / 5
+    # Floor to MiB
+    db_cache_size = math.floor(db_cache_size / (2 ** 20)) * (2 ** 20)
+    # Floor to KiB
+    db_mmap_size = math.floor(db_mmap_size / (2 ** 10)) * (2 ** 10)
+
     # Connect to DB
     db_file = base_directory.join(db_filename)
-    db = sqlite.SqliteDb(db_file.path) # TODO separate establishing connection from construction to enable context manager
+    db = sqlite.SqliteDb(
+        db_file.path,
+        db_cache_size=db_cache_size,
+        db_mmap_size=db_mmap_size,
+    ) # TODO separate establishing connection from construction to enable context manager
 
     # Create, if needed, a table for tracking loading of tables from
     # delimited files.  A fingerprint consists of the size and

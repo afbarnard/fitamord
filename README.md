@@ -42,6 +42,7 @@ Requirements
 
 * [Python 3](https://www.python.org/)
 * [PyYaml](https://github.com/yaml/pyyaml)
+* [Psutil](https://github.com/giampaolo/psutil)
 * [Barnapy](https://github.com/afbarnard/barnapy)
 * [Esal](https://github.com/afbarnard/esal)
 

@@ -40,12 +40,16 @@ class SqliteDb(database.Database):
     def __init__( # TODO max mem, max threads, other options
             self,
             filename=None,
-            sqlite_array_size=(8 * 2 ** 10), # 8Ki
+            cursor_array_size=(8 * 2 ** 10), # 8Ki
+            db_cache_size=(2 * 2 ** 30), # 2 GiB in bytes
+            db_mmap_size=(1 * 2 ** 30), # 1 GiB in bytes
     ):
         self._filename = (filename
                           if filename is not None
                           else ':memory:')
-        self._sqlite_array_size = sqlite_array_size
+        self._cursor_array_size = cursor_array_size
+        self._db_cache_size = db_cache_size
+        self._db_mmap_size = db_mmap_size
         repr_id = repr(self) + '@' + hex(id(self))
         self._logger = logging.getLogger(repr_id)
         self._logger.info(
@@ -55,6 +59,19 @@ class SqliteDb(database.Database):
         self._connection = sqlite3.connect(self._filename)
         self._logger.info('Connected')
         self._tables = {} # References to tables are circular
+
+        # Configure connection via pragmas.  (Pragmas don't work with
+        # the "?" parameter syntax, so use formatting instead.)
+        self._connection.execute('pragma cache_size = {}'.format(
+            # Use a negative value to indicate to SQLite that the
+            # requested size is in KiB, not in pages
+            -self._db_cache_size // 1024))
+        self._logger.info('DB cache size: {}', self._connection.execute(
+            'pragma cache_size').fetchall()[0][0])
+        self._connection.execute('pragma mmap_size = {}'.format(
+            self._db_mmap_size))
+        self._logger.info('DB mmap size: {}', self._connection.execute(
+            'pragma mmap_size').fetchall()[0][0])
 
     def close(self):
         """Close and invalidate the database connection"""
@@ -94,7 +111,7 @@ class SqliteDb(database.Database):
             'Executing query: {}; parameters: {}'
             .format(query, parameters))
         cursor = self._connection.cursor()
-        cursor.arraysize = self._sqlite_array_size
+        cursor.arraysize = self._cursor_array_size
         if parameters is None:
             cursor.execute(query)
         else:
@@ -106,7 +123,7 @@ class SqliteDb(database.Database):
             'Executing query: {}; parameters: {}'
             .format(query, parameters))
         cursor = self._connection.cursor()
-        cursor.arraysize = self._sqlite_array_size
+        cursor.arraysize = self._cursor_array_size
         cursor.executemany(query, parameters)
         return cursor
 
