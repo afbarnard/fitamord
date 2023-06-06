@@ -55,8 +55,8 @@ setuptools.setup(
     install_requires=[
         'barnapy ~= 0.1',
         'esal ~= 0.3',
-        'psutil ~= 5.0', # What is earliest compatible version?
-        'PyYAML ~= 3.11', # What is earliest compatible version?
+        'psutil',
+        'PyYAML',
     ],
 
     # API
