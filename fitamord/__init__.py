@@ -10,8 +10,10 @@ conceived and developed for conducting comparative observational studies
 of electronic medical records data using machine learning, but hopefully
 you will find it generally useful for modeling with relational data.
 
-Copyright (c) 2018 Aubrey Barnard.  This is free software released under
-the MIT License.  See `LICENSE.txt` for details.
+Copyright (c) 2016-2018, 2023 Aubrey Barnard.
+
+This is free software released under the MIT License.  See `LICENSE.txt`
+for details.
 """
 # The above text gets used for descriptions in `setup.py`.  Also,
 # include the copyright notice in the package docstring just for this
@@ -26,4 +28,4 @@ the MIT License.  See `LICENSE.txt` for details.
 
 
 # Version
-__version__ = '0.3.5'
+__version__ = '0.3.6'

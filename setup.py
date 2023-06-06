@@ -1,7 +1,9 @@
 """Fitamord package definition and install configuration"""
 
-# Copyright (c) 2018 Aubrey Barnard.  This is free software released
-# under the MIT License.  See `LICENSE.txt` for details.
+# Copyright (c) 2017-2018, 2023 Aubrey Barnard.
+#
+# This is free software released under the MIT License.  See
+# `LICENSE.txt` for details.
 
 
 import setuptools
@@ -12,7 +14,7 @@ import fitamord
 # Extract the descriptions from the package documentation
 _desc_paragraphs = fitamord.__doc__.strip().split('\n\n')
 _desc_short = _desc_paragraphs[0].replace('\n', ' ') # Needs to be one line
-_desc_long = _desc_paragraphs[1]
+_desc_long = '\n\n'.join(_desc_paragraphs[1:-2])
 
 
 # Define package attributes
@@ -51,8 +53,8 @@ setuptools.setup(
     # Requirements
     python_requires='~= 3.4',
     install_requires=[
-        'barnapy ~= 0.0.8',
-        'esal ~= 0.3.0',
+        'barnapy ~= 0.1',
+        'esal ~= 0.3',
         'psutil ~= 5.0', # What is earliest compatible version?
         'PyYAML ~= 3.11', # What is earliest compatible version?
     ],
